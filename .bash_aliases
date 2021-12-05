@@ -24,8 +24,10 @@ alias glsb="git branch -la"
 alias gbd="git branch -d"
 alias gshls="git stash list"
 alias gshp="git stash pop"
+alias gstat="git status"
+alias gcb="git checkout -b"
 
-untouchableBranches="master|devel|staging"
+untouchableBranches="main|master|devel|staging"
 alias gvmb="gfp && git branch --merged | grep -Ev '$untouchableBranches' >/tmp/merged-branches-$(basename $PWD) && nano /tmp/merged-branches-$(basename $PWD)"
 alias gdelmb="echo '=> This command will show a list of branches and remove them from local remote...' && read -p '=> Press enter to continue...' && nano /tmp/merged-branches-$(basename $PWD) && xargs git branch -d </tmp/merged-branches-$(basename $PWD) && rm /tmp/merged-branches-$(basename $PWD)"
 alias setdighedrepo="git config --local --replace-all core.sshcommand 'ssh -i /home/gbrl18/.ssh/id_ed25519_digheontech_gitlab' && \\
