@@ -1,0 +1,13 @@
+# ignore everythong
+*
+
+# Handpick what is not ignored
+!.gitignore
+!.bashrc
+!.profile
+!.bash_aliases_groups/
+!.bash_aliases_groups/*
+!.bash_aliases
+!.workspaces_manager.sh
+!LICENSE
+!README.md
