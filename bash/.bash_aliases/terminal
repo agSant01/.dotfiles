@@ -1,16 +1,22 @@
+#!/usr/bin/env bash
+
 # Windows related
 alias windoc="cd /mnt/c/Users/gabri/Documents"
 
 # Alias Management related
-alias srcbash="source ~/.bashrc"
+alias resrc="source ~/.bashrc"
 alias edalias="nano ~/.bash_aliases"
 alias lsalias="cat ~/.bash_aliases"
 
 # Terminal related
 alias clc="clear"
+alias clr="clear"
 alias cls="clear"
 alias ..="cd .."
 alias ...="cd ../.."
 
-# code workspaces related
-. ~/.workspaces_manager.sh
+# some more ls aliases
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias lx='ls -l'

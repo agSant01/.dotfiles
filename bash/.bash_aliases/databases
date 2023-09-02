@@ -1,2 +1,4 @@
+#!/usr/bin/env bash
+
 # DBMS Related
 alias mqlrs="sudo service mysql restart"

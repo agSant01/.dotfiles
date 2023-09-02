@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Git Related
 alias gst="git status"
 alias gc="git commit"
@@ -5,7 +7,7 @@ alias gcm="git commit -m"
 alias gpl="git pull"
 alias gp="git push"
 alias gf="git fetch"
-alias gfp="git fetch -p" 
+alias gfp="git fetch -p"
 alias glsb="git branch -la"
 alias gbd="git branch -d"
 alias gshls="git stash list"
@@ -20,14 +22,17 @@ alias gdelmb="echo '=> This command will show a list of branches and remove them
 # Get default Github .gitignore
 get-ignore() {
     if [ -z $1 ]; then
-        echo -e "get-ignore: Retrieve official Github .gitignore for a Lang\n"
-        echo -e "ERROR: Missing parameter <lang>\n"
-        echo "Usage:"
-        echo "      get-ignore <Lang>     | Pass the Lang variable as first parameter. (Capital Case)"
-        return
+        # echo -e "get-ignore: Retrieve official Github .gitignore for a Lang\n"
+        # echo -e "ERROR: Missing parameter <lang>\n"
+        # echo "Usage:"
+        # echo "      get-ignore <Lang>     | Pass the Lang variable as first parameter. (Capital Case)"
+        # return
+        local selected=$(echo "Perl Python Node" | tr ' ' '\n' | fzf)
+        local variable="$(curl -s "https://www.toptal.com/developers/gitignore/api/$selected")"
+        echo "$variable" | tail -n +4 | head -n -1 > .gitignore
+    else
+        local variable="$(curl -s "https://www.toptal.com/developers/gitignore/api/$1")"
     fi
-
-    curl https://raw.githubusercontent.com/github/gitignore/main/$1.gitignore
 
     echo -e '\n'
 }

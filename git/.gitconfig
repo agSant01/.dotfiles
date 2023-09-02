@@ -1,5 +1,5 @@
 [user]
 	email = gabriel.santiago16@upr.edu
 	name = Gabriel S Santiago
-[core]
-	sshCommand = ssh -i ~/.ssh/github
+[init]
+	defaultBranch = main

@@ -1,2 +1,4 @@
+#!/usr/bin/env bash
+
 # Python related
 alias py="python3.11"
