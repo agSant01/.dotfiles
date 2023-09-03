@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+CONFIG_FILE=.drsync.conf
+IGNORE_FILE=.drsyncignore
+
+PNAME=$(basename $0)
+
+args="^-h|^--help|^--remote-to-host|^--host-to-remote|^-v|^--verbose"
+if [ $# -ne 0 ]; then
+    for arg in $@; do
+        if [[ ! "$arg" =~ $args ]]; then
+            echo "$PNAME error: argument \"$arg\" not recognized"
+            exit 1
+        fi
+    done
+fi
+
+if [[ " $@ " =~ ( -h )|( --help )  ]]; then
+    echo "DoctorSync: drsync 1.0"
+    echo -e "Gabriel Santiago <github:agSant01>\n"
+    echo -e "Utility to wrap rsync. Syncs \$PWD with a remote server with [HOST:REMOTE] and [REMOTE_FOLDER] specified in \$PWD/$CONFIG_FILE"
+    echo -e "\nUSAGE:\n"
+    echo -e "    $PNAME -h|--help\t\t\tShow this menu."
+    echo -e "    $PNAME --remote-to-host [default] \tSync (download) files from remote to this computer (localhost)."
+    echo -e "    $PNAME --host-to-remote\t\tSync (upload) files from this computer (localhost) to the remote."
+    exit 0;
+fi
+
+if [[ ! -f $PWD/$CONFIG_FILE ]]; then
+    echo -e "$PNAME error: $CONFIG_FILE not found"
+    echo -e "HOST=\nUSER=\nREMOTE_FOLDER=" > $PWD/$CONFIG_FILE
+    echo -e "$PNAME: creating $PWD/$CONFIG_FILE"
+    exit 1
+else
+    source $PWD/$CONFIG_FILE
+    if [[ $? -ne 0 ]]; then
+        echo "$PNAME error: could not source $PWD/$CONFIG_FILE"
+        exit 2
+    fi
+    if [[ -z $HOST || -z $USER || -z $REMOTE_FOLDER ]]; then
+        echo "$PNAME error: $CONFIG_FILE variables(s) not initialized"
+        exit 3
+    fi
+fi
+
+if [[ ! -f $PWD/$IGNORE_FILE ]]; then
+    echo -e ".git\n$CONFIG_FILE\n$IGNORE_FILE" > $PWD/$IGNORE_FILE
+fi
+
+if [[ " $@ " =~ ( --host-to-remote )|( --remote-to-host ) ]]; then
+    HTR="${BASH_REMATCH[1]}"
+    RTH="${BASH_REMATCH[2]}"
+    if [[ "$HTR" =~ --host-to-remote ]]; then
+        SOURCE="$PWD"
+        DEST="$USER@$HOST:$REMOTE_FOLDER"
+    elif [[ "$RTH" =~ --remote-to-host ]]; then
+        # --remote-to-host
+        SOURCE="$USER@$HOST:$REMOTE_FOLDER"
+        DEST="$PWD"
+    fi
+fi
+
+echo "$PNAME: Connecting to \"$USER@$HOST\""
+echo "$PNAME: Source folder: $SOURCE"
+echo "$PNAME: Destination folder: $DEST"
+
+VERBOSE=$(echo "$@" | grep -Eo "(-v|--verbose)")
+
+rsync -haz $VERBOSE --progress --recursive --exclude-from="$PWD/$IGNORE_FILE" $SOURCE $DEST
