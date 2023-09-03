@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+PNAME=$(basename $0)
+
+if [[ $# = 0 ]]; then
+    echo "$PNAME error: No arguments provided"
+    echo -e "Usage:\t$PNAME [-pr] [remote_name]"
+    exit 1;
+elif [ $# = 1 ]; then
+    REMOTE_NAME=$1
+    PR_FLAG=0
+else
+    PR_FLAG=1
+    REMOTE_NAME=$2
+fi
+
+REMOTE_URL=$(git remote get-url $REMOTE_NAME)
+RET_CODE=$?
+
+if [[ $RET_CODE -ne 0 ]]; then
+    exit $RET_CODE
+fi
+
+if [[ "$REMOTE_URL" =~ ^git@github ]]; then
+    REMOTE_URL=$(echo $REMOTE_URL |
+        tr ":" "/" |
+        sed -e "s/git@/https:\/\//g" |
+        sed -e "s/.git$//g"
+    )
+fi
+
+if [[ "$PR_FLAG" = "1" ]]; then
+    REMOTE_URL="$REMOTE_URL/pulls"
+fi
+
+echo "$PNAME: opening \"$REMOTE_URL\""
+
+if [[ "$(uname -r | sed -n "/microsoft/p" | wc -l)" = "1" ]]; then
+    powershell.exe /c start $REMOTE_URL
+else
+    xgd-open $REMOTE_URL
+fi
