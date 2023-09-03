@@ -100,9 +100,9 @@ source $HOME/.paths
 # You may want to put all your additions into a separate file like
 # ~/.bash_aliases, instead of adding them here directly.
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
-if [ -d $HOME/.bash_aliases ]; then
-    for bag in "$HOME/.bash_aliases/*"; do
-        source $bag
+if [[ -d $HOME/.bash_aliases ]]; then
+    for bash_alias_group in $HOME/.bash_aliases/*; do
+        source $bash_alias_group
     done
 elif [ -f $HOME/.bash_aliases ]; then
     source $HOME/.bash_aliases
@@ -121,10 +121,14 @@ fi
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
-PATH=$PATH:/home/gbrl18/cmake-3.16.4-Linux-x86_64/bin
-
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-. "$HOME/.cargo/env"
+source "$HOME/.cargo/env"
+
+if [[ -d "$HOME/.local/modules" ]]; then
+    for file in $HOME/.local/modules/*; do
+        source $file
+    done
+fi
