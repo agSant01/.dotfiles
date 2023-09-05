@@ -5,11 +5,13 @@ IGNORE_FILE=.drsyncignore
 
 PNAME=$(basename $0)
 
-args="^-h|^--help|^--remote-to-host|^--host-to-remote|^-v|^--verbose"
+echoerr() { printf "%s\n" "$*" >&2; }
+
+args="^-h|^--help|^--remote-to-host|^--host-to-remote|^-v|^--verbose|^-n|^--dry-run"
 if [ $# -ne 0 ]; then
     for arg in $@; do
         if [[ ! "$arg" =~ $args ]]; then
-            echo "$PNAME error: argument \"$arg\" not recognized"
+            echoerr "$PNAME error: argument \"$arg\" not recognized"
             exit 1
         fi
     done
@@ -27,18 +29,18 @@ if [[ " $@ " =~ ( -h )|( --help )  ]]; then
 fi
 
 if [[ ! -f $PWD/$CONFIG_FILE ]]; then
-    echo -e "$PNAME error: $CONFIG_FILE not found"
-    echo -e "HOST=\nUSER=\nREMOTE_FOLDER=" > $PWD/$CONFIG_FILE
-    echo -e "$PNAME: creating $PWD/$CONFIG_FILE"
+    echoerr -e "$PNAME error: $CONFIG_FILE not found"
+    echoerr -e "HOST=\nUSER=\nREMOTE_FOLDER=" > $PWD/$CONFIG_FILE
+    echoerr -e "$PNAME: creating $PWD/$CONFIG_FILE"
     exit 1
 else
     source $PWD/$CONFIG_FILE
     if [[ $? -ne 0 ]]; then
-        echo "$PNAME error: could not source $PWD/$CONFIG_FILE"
+        echoerr "$PNAME error: could not source $PWD/$CONFIG_FILE"
         exit 2
     fi
     if [[ -z $HOST || -z $USER || -z $REMOTE_FOLDER ]]; then
-        echo "$PNAME error: $CONFIG_FILE variables(s) not initialized"
+        echoerr "$PNAME error: $CONFIG_FILE variables(s) not initialized"
         exit 3
     fi
 fi
@@ -47,18 +49,26 @@ if [[ ! -f $PWD/$IGNORE_FILE ]]; then
     echo -e ".git\n$CONFIG_FILE\n$IGNORE_FILE" > $PWD/$IGNORE_FILE
 fi
 
-if [[ " $@ " =~ ( --host-to-remote )|( --remote-to-host ) ]]; then
-    HTR="${BASH_REMATCH[1]}"
-    RTH="${BASH_REMATCH[2]}"
-    if [[ "$HTR" =~ --host-to-remote ]]; then
-        SOURCE="$PWD"
-        DEST="$USER@$HOST:$REMOTE_FOLDER"
-    elif [[ "$RTH" =~ --remote-to-host ]]; then
-        # --remote-to-host
+# default behaviour: SYNC FROM REMOTE TO LOCAL
+SOURCE="$USER@$HOST:$REMOTE_FOLDER"
+DEST="$PWD"
+i=0
+MODES_REGEX="(--host-to-remote)|(--remote-to-host)"
+for match in $(echo "$@" | grep -Po $MODES_REGEX); do
+    ((i++))
+    if [[ $i -ge 2 ]]; then
+        echoerr "$PNAME error: cant use both [--host-to-remote] and [--remote-to-host]"
+        exit 1
+    fi
+    if [[ "$match" =~ --remote-to-host ]]; then
+        # --remote-to-host flag
         SOURCE="$USER@$HOST:$REMOTE_FOLDER"
         DEST="$PWD"
+    elif [[ "$match" =~ --host-to-remote ]]; then
+        DEST="$USER@$HOST:$REMOTE_FOLDER"
+        SOURCE="$PWD"
     fi
-fi
+done
 
 echo "$PNAME: Connecting to \"$USER@$HOST\""
 echo "$PNAME: Source folder: $SOURCE"
@@ -66,4 +76,9 @@ echo "$PNAME: Destination folder: $DEST"
 
 VERBOSE=$(echo "$@" | grep -Eo "(-v|--verbose)")
 
-rsync -haz $VERBOSE --progress --recursive --exclude-from="$PWD/$IGNORE_FILE" $SOURCE $DEST
+if [[ " $@ " =~ ( -n )|( --dry-run ) ]]; then
+    echo -e "$PNAME dry-run:\n\n=>rsync -haz $VERBOSE --progress --recursive --exclude-from="$PWD/$IGNORE_FILE" $SOURCE $DEST\n"
+    exit 0
+fi
+
+rsync -haz $VERBOSE $extra --progress --recursive --exclude-from="$PWD/$IGNORE_FILE" $SOURCE $DEST
