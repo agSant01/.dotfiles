@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+SELECTED=`cat ~/.tmux-cht-languages.txt ~/.tmux-cht-command.txt | sort | fzf`
+
+read -p "Enter Query: " query
+
+tmux neww bash -c "cht.sh $SELECTED $query | less -R"

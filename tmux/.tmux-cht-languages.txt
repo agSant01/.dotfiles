@@ -1,0 +1,14 @@
+bash
+c
+cpp
+gdb
+golang
+javascript
+lua
+nodejs
+perl
+php
+python
+rust
+tmux
+typescript

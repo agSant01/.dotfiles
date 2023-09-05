@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+if [[ $# -eq 1 ]]; then
+    SELECTED=$1
+else
+    SELECTED=$(fd . $HOME $HOME/personal $HOME/test $HOME/**/*.git/ \
+        -E refs -E logs -E worktrees -E branches -E info -E objects -E hooks \
+        --max-depth 1 --type directory 2> /dev/null \
+        | sort -r \
+        | fzf  )
+fi
+
+if [[ -z $SELECTED ]]; then
+    exit 0
+fi
+
+IS_TMUX_RUNNING=$(pgrep tmux)
+if [[ -z $IS_TMUX_RUNNING ]]; then
+    tmux-sessionizer $SELECTED
+    exit 0
+fi
+
+if [[ $# -eq 0 ]]; then
+    ATTACH_W=1
+fi
+
+BRANCH_NAME=$(basename $SELECTED)
+SESSION_NAME=$(tmux display-message -p "#{session_name}")
+CLEAN_NAME=$(echo $BRANCH_NAME | tr "./" "__")
+TARGET="$SESSION_NAME:$CLEAN_NAME"
+
+tmux has-session -t $TARGET 2>/dev/null
+if [[ "$?" -ne "0" ]]; then
+    if [[ $ATTACH_W -eq 1 ]]; then
+        tmux new-window -n $CLEAN_NAME -c $SELECTED
+        exit 0
+    fi
+    tmux new-window -dn $CLEAN_NAME -c $SELECTED
+fi
+
+
+shift
+tmux send-keys -t $TARGET "$*" Enter

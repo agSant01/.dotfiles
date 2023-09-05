@@ -132,3 +132,5 @@ if [[ -d "$HOME/.local/modules" ]]; then
         source $file
     done
 fi
+
+source $HOME/.keybindings

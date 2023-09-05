@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-STOW_FOLDERS="bin,nvm,yarn,bash,fzf,git"
+STOW_FOLDERS="vim,tmux,bin,nvm,yarn,bash,fzf,git"
 
 for folder in $(echo $STOW_FOLDERS | sed "s/,/ /g")
 do
