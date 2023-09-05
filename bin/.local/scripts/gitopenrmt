@@ -2,9 +2,11 @@
 
 PNAME=$(basename $0)
 
+echoerr() { printf "%s\n" "$*" >&2; }
+
 if [[ $# = 0 ]]; then
-    echo "$PNAME error: No arguments provided"
-    echo -e "Usage:\t$PNAME [-pr] [remote_name]"
+    echoerr "$PNAME error: No arguments provided"
+    echoerr -e "Usage:\t$PNAME [-pr] [remote_name]"
     exit 1;
 elif [ $# = 1 ]; then
     REMOTE_NAME=$1
