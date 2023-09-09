@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 DEFAULT_EDITOR="code"
 BASE_DIR="$HOME/.bash_code_workspaces"
 
@@ -50,9 +52,9 @@ function workspaceExists() {
     if [[ ! -e $1 ]]; then
         printf "=> Error:\n"
         printf "$ERROR_X Workspace \"$2\" does not exists.\n"
-        
+
         printf "\n"
-        
+
         printf "=> Tip:\n"
         printf " $BULLET_TRIANGLE Use $FMT_FILE_PRINT\"mkwspc <workspace-name>\"$FMT_END to create it.\n"
         return 1
@@ -68,7 +70,7 @@ function lswspc() {
     do
         # get filename
         local fileName=$(basename $f)
-        
+
         # remove extension
         fileName=${fileName%.*}
 
@@ -93,7 +95,7 @@ function edwspc() {
     workspaceExists $filePath $1
     if [[ $? -eq 1 ]]; then
         return 1
-    fi   
+    fi
 
 
     $DEFAULT_EDITOR $filePath
@@ -112,7 +114,7 @@ function inswspc() {
     workspaceExists $filePath $1
     if [[ $? -eq 1 ]]; then
         return 1
-    fi 
+    fi
 
     less $filePath
 }
@@ -130,7 +132,7 @@ function xwspc() {
     workspaceExists $filePath $1
     if [[ $? -eq 1 ]]; then
         return 1
-    fi 
+    fi
 
     bash $filePath
 }
@@ -144,7 +146,7 @@ function mkwspc() {
     if [[ $? -eq 1 ]]; then
         return 1
     fi
-    
+
     local alias_name=$1
 
     local fileName="$BASE_DIR/$alias_name.sh"
@@ -152,9 +154,9 @@ function mkwspc() {
     if [[ -e $fileName ]]; then
         printf "=> Error:\n"
         printf "$ERROR_X File \"$fileName\" already exists.\n"
-        
+
         printf "\n"
-        
+
         printf "=> Tip:\n"
         printf " $BULLET_TRIANGLE Use $FMT_FILE_PRINT\"inswspc $alias_name\"$FMT_END to inspect its contents.\n"
         return 1
