@@ -4,11 +4,11 @@ cat
 chmod
 chown
 cp
-cp
 docker
 docker-compose
 fd
 find
+fzf
 git
 git-commit
 git-rebase
@@ -34,5 +34,7 @@ stow
 tail
 tar
 tldr
+tmux
+top
 tr
 xargs

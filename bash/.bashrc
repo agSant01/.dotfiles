@@ -119,13 +119,11 @@ if ! shopt -oq posix; then
   fi
 fi
 
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
-
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-
-source "$HOME/.cargo/env"
+if [[ -d $HOME/.bash_scripts ]]; then
+    for scripts in $HOME/.bash_scripts/*; do
+        source $scripts
+    done
+fi
 
 if [[ -d "$HOME/.local/modules" ]]; then
     for file in $HOME/.local/modules/*; do
@@ -133,4 +131,11 @@ if [[ -d "$HOME/.local/modules" ]]; then
     done
 fi
 
+[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+source "$HOME/.cargo/env"
 source $HOME/.keybindings
