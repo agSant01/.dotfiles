@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-if [[ $# -eq 1 ]]; then
+if [[ $# -gt 1 ]]; then
     SELECTED=$1
 else
     SELECTED=$(fd . $HOME $HOME/personal $HOME/test $HOME/**/*.git/ \
@@ -37,7 +37,6 @@ if [[ "$?" -ne "0" ]]; then
     fi
     tmux new-window -dn $CLEAN_NAME -c $SELECTED
 fi
-
 
 shift
 tmux send-keys -t $TARGET "$*" Enter

@@ -7,7 +7,8 @@ else
         -E refs -E logs -E worktrees -E branches -E info -E objects -E hooks \
         --max-depth 1 --type directory 2> /dev/null \
         | sort -r \
-        | fzf  )
+        | fzf  --print-query \
+        | tail -n 1)
 fi
 
 if [[ -z $SELECTED ]]; then

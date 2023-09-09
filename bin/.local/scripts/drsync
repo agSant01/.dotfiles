@@ -7,7 +7,7 @@ PNAME=$(basename $0)
 
 echoerr() { printf "%s\n" "$*" >&2; }
 
-args="^-h|^--help|^--remote-to-host|^--host-to-remote|^-v|^--verbose|^-n|^--dry-run"
+args="^-h|^--help|^--remote-to-host|^--host-to-remote|^-v|^--verbose|^-n|^--dry-run|^-dig|^--dump-ignore"
 if [ $# -ne 0 ]; then
     for arg in $@; do
         if [[ ! "$arg" =~ $args ]]; then
@@ -30,7 +30,7 @@ fi
 
 if [[ ! -f $PWD/$CONFIG_FILE ]]; then
     echoerr -e "$PNAME error: $CONFIG_FILE not found"
-    echoerr -e "HOST=\nUSER=\nREMOTE_FOLDER=" > $PWD/$CONFIG_FILE
+    echo -e "HOST=\nUSER=\nREMOTE_FOLDER=" > $PWD/$CONFIG_FILE
     echoerr -e "$PNAME: creating $PWD/$CONFIG_FILE"
     exit 1
 else
@@ -63,10 +63,10 @@ for match in $(echo "$@" | grep -Po $MODES_REGEX); do
     if [[ "$match" =~ --remote-to-host ]]; then
         # --remote-to-host flag
         SOURCE="$USER@$HOST:$REMOTE_FOLDER"
-        DEST="$PWD"
+        DEST="$PWD/"
     elif [[ "$match" =~ --host-to-remote ]]; then
+        SOURCE="$PWD/"
         DEST="$USER@$HOST:$REMOTE_FOLDER"
-        SOURCE="$PWD"
     fi
 done
 
@@ -77,8 +77,17 @@ echo "$PNAME: Destination folder: $DEST"
 VERBOSE=$(echo "$@" | grep -Eo "(-v|--verbose)")
 
 if [[ " $@ " =~ ( -n )|( --dry-run ) ]]; then
+    EXIT=1
     echo -e "$PNAME dry-run:\n\n=>rsync -haz $VERBOSE --progress --recursive --exclude-from="$PWD/$IGNORE_FILE" $SOURCE $DEST\n"
     exit 0
 fi
+
+if [[ " $@ " =~ ( -dig )|( --dump-ignore ) ]]; then
+    EXIT=1
+    echo -e "Excluding the files:\n---\n$(cat $PWD/$IGNORE_FILE)\n---"
+    exit 0
+fi
+
+[ $EXIT ] && exit 0;
 
 rsync -haz $VERBOSE $extra --progress --recursive --exclude-from="$PWD/$IGNORE_FILE" $SOURCE $DEST
