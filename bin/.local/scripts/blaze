@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-DEFAULT_EDITOR="code"
-BASE_DIR="$HOME/.bash_code_workspaces"
+[ -z $BLAZE_WKSPCS_EDITOR ] && BLAZE_WKSPCS_EDITOR="code"
+[ -z $BLAZE_WKSPCS_DIR ] && BLAZE_WKSPCS_DIR="$HOME/.workspaces"
 
 BULLET_TRIANGLE="\u27A4"
 ERROR_X="\u274C"
@@ -15,8 +15,8 @@ italic()        { ansi 3 "$@"; }
 underline()     { ansi 4 "$@"; }
 
 ## create workspaces directory if it not exists
-if [ ! -d ~/.bash_code_workspaces ]; then
-    mkdir ~/.bash_code_workspaces
+if [ ! -d $BLAZE_WKSPCS_DIR ]; then
+    mkdir $BLAZE_WKSPCS_DIR
 fi
 
 function header() {
@@ -26,7 +26,7 @@ function header() {
 function showHelp() {
     header
     printf "Help Center:\n"
-    printf " mkwspc   <workspace-name>  Create a new workspace in ~/.bash_code_workspaces\n"
+    printf " mkwspc   <workspace-name>  Create a new workspace in $BLAZE_WKSPCS_DIR\n"
     printf " lswspc                     List all the available workspaces.\n"
     printf " edwspc   <workspace-name>  Edit the workspace if it exists.\n"
     printf " inswspc  <workspace-name>  Inspect the contents of workspaces with unix 'less'\n"
@@ -49,9 +49,11 @@ function validateInput() {
 ##  - filePath
 ##  - alias
 function workspaceExists() {
-    if [[ ! -e $1 ]]; then
+    FILE_PATH=$1
+    ALIAS=$2
+    if [[ ! -e $FILE_PATH ]]; then
         printf "=> Error:\n"
-        printf "$ERROR_X Workspace \"$2\" does not exists.\n"
+        printf "$ERROR_X Workspace \"$ALIAS\" does not exists.\n"
 
         printf "\n"
 
@@ -66,7 +68,7 @@ function workspaceExists() {
 function lswspc() {
     header
     printf "Workspaces List:\n"
-    for f in "$BASE_DIR"/*
+    for f in "$BLAZE_WKSPCS_DIR"/*
     do
         # get filename
         local fileName=$(basename $f)
@@ -90,15 +92,14 @@ function edwspc() {
         return 1
     fi
 
-    local filePath=$BASE_DIR/$1.sh
+    local filePath=$BLAZE_WKSPCS_DIR/$1.sh
 
     workspaceExists $filePath $1
     if [[ $? -eq 1 ]]; then
         return 1
     fi
 
-
-    $DEFAULT_EDITOR $filePath
+    $BLAZE_WKSPCS_EDITOR $filePath
 }
 
 function inswspc() {
@@ -108,7 +109,7 @@ function inswspc() {
         return 1
     fi
 
-    local filePath=$BASE_DIR/$1.sh
+    local filePath=$BLAZE_WKSPCS_DIR/$1.sh
 
     # validate if wkspace exists
     workspaceExists $filePath $1
@@ -126,7 +127,7 @@ function xwspc() {
         return 1
     fi
 
-    local filePath=$BASE_DIR/$1.sh
+    local filePath=$BLAZE_WKSPCS_DIR/$1.sh
 
     # validate if wkspace exists
     workspaceExists $filePath $1
@@ -149,7 +150,7 @@ function mkwspc() {
 
     local alias_name=$1
 
-    local fileName="$BASE_DIR/$alias_name.sh"
+    local fileName="$BLAZE_WKSPCS_DIR/$alias_name.sh"
 
     if [[ -e $fileName ]]; then
         printf "=> Error:\n"
@@ -166,18 +167,77 @@ function mkwspc() {
     printf "# Exit on first error\n" >> $fileName
     printf "set -e\n\n" >> $fileName
     printf "# Start\n" >> $fileName
-    printf "echo \"==> Executing commands for workspace $alias_name...\"\n\n" >> $fileName
+    printf "echo \"$(basename $0): executing commands for workspace \\\"$alias_name\\\"...\"\n\n" >> $fileName
     printf "# Proyect directory\n" >> $fileName
-    printf "BASE_DIR=$projectDir\n" >> $fileName
-    printf "cd \$BASE_DIR\n\n" >> $fileName
+    printf "PROJECT_DIR=$projectDir\n" >> $fileName
+    printf "cd \$PROJECT_DIR\n\n" >> $fileName
     printf "# Write commands here\n\n\n\n" >> $fileName
     printf "# End\n" >> $fileName
-    printf "echo \"==> Success executing commands for workspace $alias_name...\"\n" >> $fileName
+    printf "echo \"$(basename $0): success executing commands for workspace \\\"$alias_name\\\"...\"\n" >> $fileName
     printf "Saved in: $fileName\n"
 
-    $DEFAULT_EDITOR $fileName
+    $BLAZE_WKSPCS_EDITOR $fileName
 }
 
-function workspace-manager() {
-    showHelp
+has_argument() {
+    [[ ("$1" == *=* && -n ${1#*=}) || ( ! -z "$2" && "$2" != -*)  ]];
 }
+
+while [ $# -gt 0 ]; do
+  case $1 in
+        # mkwspc
+        # edwspc
+        # inswspc
+        # xwspc
+        # handle options
+        -h | --help) # display Help
+            showHelp
+            exit;;
+        -l | --list)
+            lswspc
+            exit;;
+        -i | --inspect)
+            if ! has_argument $@; then
+                echo "$(basename $0) error: workspace not specified." >&2
+                showHelp
+                exit 1
+            fi
+            shift
+            inswspc $1
+            exit 0;;
+        -e | --edit)
+            if ! has_argument $@; then
+                echo "$(basename $0) error: workspace not specified." >&2
+                showHelp
+                exit 1
+            fi
+            shift
+            edwspc $1
+            exit 0;;
+        -x | --execute)
+            if ! has_argument $@; then
+                echo "$(basename $0) error: workspace not specified." >&2
+                showHelp
+                exit 1
+            fi
+            shift
+            xwspc $1
+            exit 0;;
+        -c | --create)
+            if ! has_argument $@; then
+                echo "$(basename $0) error: workspace not specified." >&2
+                showHelp
+                exit 1
+            fi
+            shift
+            mkwspc $1
+            exit 0;;
+        *)
+            echo "$(basename $0) error: Invalid option: $1" >&2
+            showHelp
+            exit 1;;
+  esac
+  shift
+done
+
+showHelp
