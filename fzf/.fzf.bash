@@ -12,7 +12,7 @@ fi
 # ------------
 source "/home/gbrl18/.fzf/shell/key-bindings.bash"
 
-export FZF_DEFAULT_COMMAN="fd -H --color=always"
+export FZF_DEFAULT_COMMAND="fd -H --color=always"
 export FZF_CTRL_T_COMMAND="$FZF_CTRL_T_COMMAND"
 export FZF_DEFAULT_OPTS="--ansi"
 

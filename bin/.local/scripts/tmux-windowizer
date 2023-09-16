@@ -3,11 +3,13 @@
 if [[ $# -gt 1 ]]; then
     SELECTED=$1
 else
-    SELECTED=$(fd . $HOME $HOME/personal $HOME/test $HOME/**/*.git/ \
+    SELECTED=$(fd '.' $PWD $HOME \
         -E refs -E logs -E worktrees -E branches -E info -E objects -E hooks \
-        --max-depth 1 --type directory 2> /dev/null \
+        --min-depth 0 --max-depth 1 --type directory -a 2> /dev/null \
+        | uniq \
         | sort -r \
-        | fzf  )
+        | fzf --print-query \
+        | tail -n 1)
 fi
 
 if [[ -z $SELECTED ]]; then
