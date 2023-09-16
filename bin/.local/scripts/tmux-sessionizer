@@ -5,7 +5,7 @@ if [[ $# -eq 1 ]]; then
 else
     SELECTED=$(fd . $HOME $HOME/personal $HOME/test $HOME/**/*.git/ \
         -E refs -E logs -E worktrees -E branches -E info -E objects -E hooks \
-        --max-depth 1 --type directory -a 2> /dev/null \
+        --max-depth 1 --type directory -a --color=always 2> /dev/null \
         | uniq \
         | sort -r \
         | fzf  --print-query \
