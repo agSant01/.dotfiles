@@ -9,6 +9,8 @@ ERROR_X="\u274C"
 FMT_FILE_PRINT="\e[3;36m"
 FMT_END="\e[0m"
 
+PROGRAM_NAME=$(basename $0)
+
 ansi()          { echo -e "\e[${1}m${*:2}\e[0m"; }
 bold()          { ansi 1 "$@"; }
 italic()        { ansi 3 "$@"; }
@@ -20,19 +22,22 @@ if [ ! -d $BLAZE_WKSPCS_DIR ]; then
 fi
 
 function header() {
-    printf "=> Welcome to the Bash Scripting Worskspace Manager.\n\n"
+    printf "$PROGRAM_NAME:\n"
 }
 
 function showHelp() {
-    header
-    printf "Help Center:\n"
-    printf " mkwspc   <workspace-name>  Create a new workspace in $BLAZE_WKSPCS_DIR\n"
-    printf " lswspc                     List all the available workspaces.\n"
-    printf " edwspc   <workspace-name>  Edit the workspace if it exists.\n"
-    printf " inswspc  <workspace-name>  Inspect the contents of workspaces with unix 'less'\n"
-    printf " xwspc    <workspace-name>  Execute the workspace as a script.\n"
-    printf "                            It will execute the script with the privilegdes of the logged user. Use with caution.\n"
+    printf "Usage: $PROGRAM_NAME [OPTION] [WORKSPACE_NAME]\n"
+    printf "       $PROGRAM_NAME --list\n"
+    printf "       $PROGRAM_NAME --create WORKSPACE1\n"
+    printf "       $PROGRAM_NAME --edit   WORKSPACE1\n"
     printf "\n"
+    printf "    -c, --create  [WORKSPACE_NAME] \tCreates a new workspace in $BLAZE_WKSPCS_DIR\n"
+    printf "    -l, --list                     \tList all the available workspaces.\n"
+    printf "    -e, --edit    [WORKSPACE_NAME] \tEdit the workspace if it exists.\n"
+    printf "    -i, --inspect [WORKSPACE_NAME] \tInspect the contents of workspaces with unix 'less'\n"
+    printf "    -x, --execute                  \tExecute the workspace as a script. It will execute the script with the\n"
+    printf "                                   \tprivilegdes of the logged user. Use with caution.\n"
+    printf ""
 }
 
 function validateInput() {
@@ -54,11 +59,9 @@ function workspaceExists() {
     if [[ ! -e $FILE_PATH ]]; then
         printf "=> Error:\n"
         printf "$ERROR_X Workspace \"$ALIAS\" does not exists.\n"
-
         printf "\n"
-
         printf "=> Tip:\n"
-        printf " $BULLET_TRIANGLE Use $FMT_FILE_PRINT\"mkwspc <workspace-name>\"$FMT_END to create it.\n"
+        printf " $BULLET_TRIANGLE Use $FMT_FILE_PRINT\"$PROGRAM_NAME -c|--create $ALIAS\"$FMT_END to create it.\n"
         return 1
     fi
 
@@ -66,8 +69,7 @@ function workspaceExists() {
 }
 
 function lswspc() {
-    header
-    printf "Workspaces List:\n"
+    printf "$PROGRAM_NAME: workspaces list:\n"
     for f in "$BLAZE_WKSPCS_DIR"/*
     do
         # get filename
@@ -79,9 +81,8 @@ function lswspc() {
         printf " $BULLET_TRIANGLE $fileName\n"
     done
 
-    printf "\n\nAdditional Tips:\n"
-    printf " $BULLET_TRIANGLE To inspect the contents of a workspace use $FMT_FILE_PRINT\"inswspc <workspace-name>\"$FMT_END\n"
-
+    printf "\nAdditional Tips:\n"
+    printf " $BULLET_TRIANGLE To inspect the contents of a workspace use $FMT_FILE_PRINT\"$PROGRAM_NAME -i|--inspect WORKSPACE_NAME\"$FMT_END\n"
     printf "\n"
 }
 
@@ -159,11 +160,12 @@ function mkwspc() {
         printf "\n"
 
         printf "=> Tip:\n"
-        printf " $BULLET_TRIANGLE Use $FMT_FILE_PRINT\"inswspc $alias_name\"$FMT_END to inspect its contents.\n"
+        printf " $BULLET_TRIANGLE Use $FMT_FILE_PRINT\"$PROGRAM_NAME -i|--inspect $alias_name\"$FMT_END to inspect its contents.\n"
         return 1
     fi
 
     touch $fileName
+    chmod 0755 $fileName
     printf "# Exit on first error\n" >> $fileName
     printf "set -e\n\n" >> $fileName
     printf "# Start\n" >> $fileName
@@ -183,12 +185,14 @@ has_argument() {
     [[ ("$1" == *=* && -n ${1#*=}) || ( ! -z "$2" && "$2" != -*)  ]];
 }
 
+if [ $# -eq 0 ]; then
+    echo "No arguments given." >&2
+    echo "See $PROGRAM_NAME --help" >&2
+    exit 1;
+fi
+
 while [ $# -gt 0 ]; do
   case $1 in
-        # mkwspc
-        # edwspc
-        # inswspc
-        # xwspc
         # handle options
         -h | --help) # display Help
             showHelp
@@ -199,7 +203,7 @@ while [ $# -gt 0 ]; do
         -i | --inspect)
             if ! has_argument $@; then
                 echo "$(basename $0) error: workspace not specified." >&2
-                showHelp
+                echo "See $PROGRAM_NAME --help" >&2
                 exit 1
             fi
             shift
@@ -208,7 +212,7 @@ while [ $# -gt 0 ]; do
         -e | --edit)
             if ! has_argument $@; then
                 echo "$(basename $0) error: workspace not specified." >&2
-                showHelp
+                echo "See $PROGRAM_NAME --help" >&2
                 exit 1
             fi
             shift
@@ -216,8 +220,8 @@ while [ $# -gt 0 ]; do
             exit 0;;
         -x | --execute)
             if ! has_argument $@; then
-                echo "$(basename $0) error: workspace not specified." >&2
-                showHelp
+                echo -e "$(basename $0) error: workspace not specified." >&2
+                echo "See $PROGRAM_NAME --help" >&2
                 exit 1
             fi
             shift
@@ -225,19 +229,17 @@ while [ $# -gt 0 ]; do
             exit 0;;
         -c | --create)
             if ! has_argument $@; then
-                echo "$(basename $0) error: workspace not specified." >&2
-                showHelp
+                echo -e "$(basename $0) error: workspace not specified." >&2
+                echo "See $PROGRAM_NAME --help" >&2
                 exit 1
             fi
             shift
             mkwspc $1
             exit 0;;
         *)
-            echo "$(basename $0) error: Invalid option: $1" >&2
+            echo -e "$(basename $0) error: Invalid option: $1\n" >&2
             showHelp
             exit 1;;
   esac
   shift
 done
-
-showHelp

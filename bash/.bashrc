@@ -58,13 +58,6 @@ if [ -n "$force_color_prompt" ]; then
     fi
 fi
 
-if [ "$color_prompt" = yes ]; then
-    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
-else
-    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
-fi
-unset color_prompt force_color_prompt
-
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
 xterm*|rxvt*)
@@ -97,6 +90,7 @@ source $HOME/.env
 source $HOME/.paths
 source "$HOME/.cargo/env"
 source $HOME/.keybindings
+source "$HOME/.dotfiles/colors.sh"
 
 # Alias definitions.
 # You may want to put all your additions into a separate file like
@@ -121,6 +115,8 @@ if ! shopt -oq posix; then
   fi
 fi
 
+[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+
 if [[ -d $HOME/.bash_scripts ]]; then
     for scripts in $HOME/.bash_scripts/*; do
         source $scripts
@@ -133,12 +129,12 @@ if [[ -d "$HOME/.local/modules" ]]; then
     done
 fi
 
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
-
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
+export MODULAR_HOME="/home/gbrl18/.modular"
+export PATH="/home/gbrl18/.modular/pkg/packages.modular.com_mojo/bin:$PATH"
 
 if [ "$color_prompt" = yes ]; then
     export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\] \[\033[01;34m\]\w\[\033[00m\] ${LIGHT_YELLOW}$(python_virtualenv)${RESET}\$ '
