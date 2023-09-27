@@ -136,8 +136,25 @@ export NVM_DIR="$HOME/.nvm"
 export MODULAR_HOME="/home/gbrl18/.modular"
 export PATH="/home/gbrl18/.modular/pkg/packages.modular.com_mojo/bin:$PATH"
 
+# Must go after imports of .bash_scripts/ and .local/modules
+# Must go before setup of PS1
+function cd() {
+    # override actions Before cd'in to a directory go here
+
+    builtin cd "$@"
+
+    # override actions After cd'in to a directory go here
+    activate_pyvenv
+
+    # to update the status line of tmux
+    if [ $TMUX ]; then
+        tmux refresh-client S
+    fi
+}
+
+
 if [ "$color_prompt" = yes ]; then
-    export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\] \[\033[01;34m\]\w\[\033[00m\] ${LIGHT_YELLOW}$(python_virtualenv)${RESET}\$ '
+    export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\] \[\033[01;34m\]\w\[\033[00m\] ${LIGHT_YELLOW}$(python_virtualenv)${LIGHT_GREEN}$(node_version)${RESET}\$ '
 else
     export PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
 fi
