@@ -1,5 +1,18 @@
 [user]
 	email = gabriel.santiago16@upr.edu
-	name = Gabriel S Santiago
+	name  = Gabriel S Santiago
 [init]
 	defaultBranch = main
+[alias]
+	a		 = !cd ${GIT_PREFIX:-.} && git add . && git s
+	aa		 = !git add -A && git s
+	c		 = commit
+	d		 = diff
+	ll		 = log --pretty=better-oneline --numstat
+	ls		 = log --pretty=better-oneline
+	s		 = status
+	t 		 = "!bash /home/gbrl18/.dotfiles/bin/.local/scripts/h"
+	tree	 = log --pretty=better-oneline --all --graph
+	wt		 = worktree
+	wt-clone = "!clone-bare"
+	wtl		 = worktree list -v

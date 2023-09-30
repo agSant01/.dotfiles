@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# main
+alias g='git'; source /usr/share/bash-completion/completions/git; __git_complete g __git_main;
+
 # Git Related
 alias gst="git status"
 alias gc="git commit"
@@ -14,6 +17,10 @@ alias gshls="git stash list"
 alias gshp="git stash pop"
 alias gstat="git status"
 alias gcb="git checkout -b"
+alias ga="git add"
+
+# worktrees
+alias wtl="wt-list"
 
 untouchableBranches="main|master|devel|staging"
 alias gvmb="gfp && git branch --merged | grep -Ev '$untouchableBranches' >/tmp/merged-branches-$(basename $PWD) && nano /tmp/merged-branches-$(basename $PWD)"
