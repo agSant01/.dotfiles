@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+pushd $HOME/ansible
+
+ansible-playbook local.yml $@
+
+popd

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-STOW_FOLDERS="vim,tmux,bin,nvm,yarn,bash,fzf,git,fdfind"
+STOW_FOLDERS="vim,tmux,bin,nvm,yarn,bash,gh,fzf,git,fdfind"
 STOW_DIR="$HOME"
 
 if [[ -e ~/.bashrc.bk ]] || [[ -e ~/.profile.bk ]]; then
