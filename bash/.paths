@@ -2,3 +2,19 @@
 
 addToPath "$HOME/.local/scripts"
 addToPath "$HOME/cmake-3.16.4-Linux-x86_64/bin"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+addToPathFront "$BUN_INSTALL/bin"
+
+addToPath "/usr/local/go/bin"
+
+# set PATH so it includes user's private bin if it exists
+if [ -d "$HOME/bin" ] ; then
+    addToPathFront "$HOME/bin"
+fi
+
+# set PATH so it includes user's private bin if it exists
+if [ -d "$HOME/.local/bin" ] ; then
+    addToPathFront "$HOME/.local/bin"
+fi

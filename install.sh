@@ -8,8 +8,8 @@ if [[ -e ~/.bashrc.bk ]] || [[ -e ~/.profile.bk ]]; then
     exit 1;
 fi
 
-mv ~/.bashrc ~/.bashrc.bk
-mv ~/.profile ~/.profile.bk
+cp -L ~/.bashrc ~/.bashrc.bk
+cp -L ~/.profile ~/.profile.bk
 
 pushd ~/.dotfiles
 
