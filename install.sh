@@ -11,7 +11,10 @@ STOW_FOLDERS=(vim tmux bin nvm yarn bash gh fzf git fdfind perl)
 STOW_DIR="$HOME"
 
 cp -L ~/.bashrc ~/.bashrc.bk
+rm $HOME/.bashrc
 cp -L ~/.profile ~/.profile.bk
+rm $HOME/.profile
+rm -f ~/.bash_logout
 
 echo -e "$GREEN[SETUP]$RESET_COLOR Start...\n"
 
