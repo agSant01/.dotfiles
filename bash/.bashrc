@@ -118,7 +118,7 @@ fi
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
 if [[ -d $HOME/.bash_scripts ]]; then
-    for scripts in $HOME/.bash_scripts/*; do
+    for scripts in $HOME/.bash_scripts/*.sh; do
         source $scripts
     done
 fi
@@ -134,7 +134,6 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 export MODULAR_HOME="/home/gbrl18/.modular"
-export PATH="/home/gbrl18/.modular/pkg/packages.modular.com_mojo/bin:$PATH"
 
 # Must go after imports of .bash_scripts/ and .local/modules
 # Must go before setup of PS1
@@ -152,9 +151,10 @@ function cd() {
     fi
 }
 
+source $HOME/.bash_scripts/custom_bash_prompt.sh
 
-if [ "$color_prompt" = yes ]; then
-    export PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\] \[\033[01;34m\]\w\[\033[00m\] ${LIGHT_YELLOW}$(python_virtualenv)${LIGHT_GREEN}$(node_version)${RESET}\$ '
+if [ "$color_prompt" = "yes" ]; then
+    export PS1='${debian_chroot:+($debian_chroot)}$(custom_prompt)\n\$ '
 else
     export PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
 fi

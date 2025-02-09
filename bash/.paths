@@ -7,7 +7,15 @@ addToPath "$HOME/cmake-3.16.4-Linux-x86_64/bin"
 export BUN_INSTALL="$HOME/.bun"
 addToPathFront "$BUN_INSTALL/bin"
 
+# GoLang
 addToPath "/usr/local/go/bin"
+
+# Perl
+addToPathFront "$HOME/perl5/bin"
+addPerlInc "$HOME/perl5/lib/perl5"
+
+# Modular
+addToPath "/home/gbrl18/.modular/pkg/packages.modular.com_mojo/bin"
 
 # set PATH so it includes user's private bin if it exists
 if [ -d "$HOME/bin" ] ; then
