@@ -11,7 +11,7 @@ node_version() {
             node_version=$(node -v 2> /dev/null)
 
             if [[ $? -eq 0 ]]; then
-                echo -en "($node_version) "
+                echo -en " ($node_version)"
             fi
         fi
         dir=$(dirname "$dir")

@@ -94,7 +94,7 @@ git_super_status() {
 
         PROMPT="${PROMPT}${RESET_COLOR}${THEME_GIT_PROMPT_SUFFIX}"
 
-        echo -ne "$PROMPT"
+        echo -en " $PROMPT"
     fi
 }
 

@@ -11,19 +11,9 @@ custom_prompt() {
     user_host_prompt="$(whoami)@$(hostname)"
     user_host_prompt_len=$((${#user_host_prompt}+$cwd_len+1))
 
-    git_status_msg=$(git_super_status)
-    git_status_len=$(echo "$git_status_len" | sed -r 's/\x1B\[[0-9;]*[a-zA-Z]//g')
+    git_status_msg="$(git_super_status)"
+    git_status_len=$(echo "$git_status_msg" | sed -r 's/\x1B\[[0-9;]*[a-zA-Z]//g')
     git_status_len=${#git_status_len}
-
-    user_path_divider=""
-    git_path_divider=""
-
-    if [ $(($user_host_prompt_len+$git_status_len)) -gt $term_width ]; then
-        user_path_divider="\n\e"
-        if [ $(($cwd_len+$git_status_len)) -gt $term_width ]; then
-            git_path_divider="\n\e"
-        fi
-    fi
 
     # other options: ○ ● ◌ ◎ • ◦
     local STATUS_COLOR="$OK_PS1●"
@@ -37,8 +27,31 @@ custom_prompt() {
         EXIT_CODE=""
     fi
 
-    HOST_PATH="${STATUS_COLOR}${RESET_COLOR} $GREEN${user_host_prompt}${RESET_COLOR} $user_path_divider$BLUE$current_dir${RESET_COLOR} "
-    EXTENSIONS="$git_path_divider$git_status_msg${RESET_COLOR}$YELLOW$(python_virtualenv)\e[01;32m$(node_version)${RESET_COLOR}"
+    user_path_divider=" "
+    git_path_divider=""
+
+    if [ $(($user_host_prompt_len+$git_status_len)) -gt $term_width ]; then
+        user_path_divider="\n "
+        if [ $(($cwd_len+$git_status_len)) -gt $term_width ]; then
+            git_path_divider="\n"
+        fi
+    fi
+
+    HOST_PATH="${STATUS_COLOR}${RESET_COLOR} $GREEN${user_host_prompt}${RESET_COLOR}${user_path_divider}${BLUE}${current_dir}${RESET_COLOR}"
+
+    GIT_EXT="${git_path_divider}${git_status_msg}${RESET_COLOR}"
+    PYTHON_EXT="${python_divider}${YELLOW}$(python_virtualenv)"
+    NODE_EXT="${node_divider}${GREEN}$(node_version)"
+    EXTENSIONS="${GIT_EXT}${PYTHON_EXT}${NODE_EXT}${RESET_COLOR}"
+
+    host_len="$(echo -e "$HOST_PATH$EXTENSIONS ${EXIT_CODE}" | sed -E 's/\x1B\[[0-9;]*[JKmsu]//g')"
+    host_len=${#host_len}
+
+    if [ $host_len -gt $term_width ]; then
+        EXIT_CODE="\n$EXIT_CODE"
+    else
+        EXIT_CODE=" $EXIT_CODE"
+    fi
 
     echo -en "${HOST_PATH}${EXTENSIONS}${EXIT_CODE}"
 }
