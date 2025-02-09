@@ -22,8 +22,8 @@ sub isConflict {
     return
          $index eq 'U'
       || $workingTree eq 'U'
-      || ( $index eq 'A' && $workingTree == 'A' )
-      || ( $index eq 'D' && $workingTree == 'D' );
+      || ( $index eq 'A' && $workingTree eq 'A' )
+      || ( $index eq 'D' && $workingTree eq 'D' );
 }
 
 sub isUntracked { return shift eq '?'; }

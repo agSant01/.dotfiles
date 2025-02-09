@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+TMUX_RUNNING=$(pgrep tmux)
+[ -z $TMUX_RUNNING ] && exit 0
+
+SELECTED_SESSION=$(tmux ls -F "#{session_id} #{host} / #{session_name} #{?session_attached,(attached),}" | sort | fzf-tmux --reverse --select-1 -p --cycle)
+
+SELECTED_SESSION=$(echo $SELECTED_SESSION | cut -d " " -f 4)
+
+tmux switch -t $SELECTED_SESSION

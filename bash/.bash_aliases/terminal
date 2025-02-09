@@ -20,3 +20,5 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 alias lx='ls -l'
+
+alias upup="sudo apt update && sudo apt upgrade"

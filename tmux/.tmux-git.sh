@@ -8,7 +8,9 @@ print_git_branch() {
     branch=$(cd "$working_dir" && git symbolic-ref --short HEAD)
   fi
 
-  echo $branch
+  if [ $branch ]; then
+    echo "git:($branch) "
+  fi
 }
 
 print_git_branch
