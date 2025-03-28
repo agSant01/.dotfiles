@@ -22,3 +22,6 @@ alias l='ls -CF'
 alias lx='ls -l'
 
 alias upup="sudo apt update && sudo apt upgrade"
+
+
+alias python="python3"
