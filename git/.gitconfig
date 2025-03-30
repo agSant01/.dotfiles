@@ -16,3 +16,4 @@
 	wt		 = worktree
 	wt-clone = "!clone-bare"
 	wtl		 = worktree list -v
+    open-remote = !gh repo view -w
