@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+alias np-delete="fd -I node_modules -x rm -r"

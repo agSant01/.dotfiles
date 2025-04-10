@@ -3,9 +3,9 @@
 if [[ $# -eq 1 ]]; then
     SELECTED=$1
 else
-    SELECTED=$(fd . $PWD $HOME $HOME/personal $HOME/test $HOME/**/*.git/ \
+    SELECTED=$(fd . $PWD $HOME $HOME/personal $HOME/projects-workspace $HOME/test $HOME/**/*.git/ \
         -E refs -E logs -E worktrees -E branches -E info -E objects -E hooks \
-        --max-depth 1 --type directory -a --color=always 2> /dev/null \
+        --max-depth 1 --type directory -a 2> /dev/null \
         | uniq \
         | sort -r \
         | fzf  --print-query \
@@ -21,7 +21,7 @@ SELECTED_NAME=$(basename "$SELECTED" | tr . _)
 IS_TMUX_RUNNING=$(pgrep tmux)
 
 if [[ -z $TMUX ]] && [[ -z $IS_TMUX_RUNNING ]]; then
-    tmux new-session -s $SELECTED_NAME -c $SELECTED -n bash
+    tmux new-session -s $SELECTED_NAME -c $SELECTED
     exit 0
 fi
 

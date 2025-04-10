@@ -1,5 +1,5 @@
 [user]
-	email = gsantiagoguzman@gmail.com
+	email = g.santiago@orbisops.com
 	name = Gabriel Santiago
 [init]
 	defaultBranch = main
@@ -17,3 +17,5 @@
 	wt-clone = "!clone-bare"
 	wtl		 = worktree list -v
     open-remote = !gh repo view -w
+[core]
+	sshCommand = ssh -i ~/.ssh/id_ed25519_orbis_gh

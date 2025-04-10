@@ -1,0 +1,1 @@
+alias plantuml="podman run -d -p 8080:8080 plantuml/plantuml-server:tomcat; open http://localhost:8080"

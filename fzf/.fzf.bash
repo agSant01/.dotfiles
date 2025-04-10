@@ -6,11 +6,22 @@ fi
 
 # Auto-completion
 # ---------------
-[[ $- == *i* ]] && source "$HOME/.fzf/shell/completion.bash" 2> /dev/null
+
+if [[ $(uname) -eq "Darwin" ]]; then
+  [[ $- == *i* ]] && source "$HOME/.fzf/shell/completion.zsh" 2> /dev/null
+else;
+  [[ $- == *i* ]] && source "$HOME/.fzf/shell/completion.bash" 2> /dev/null
+fi
 
 # Key bindings
 # ------------
-source "$HOME/.fzf/shell/key-bindings.bash"
+
+
+if [[ $(uname) -eq "Darwin" ]]; then
+  source "$HOME/.fzf/shell/key-bindings.zsh"
+else;
+  source "$HOME/.fzf/shell/key-bindings.bash"
+fi
 
 export FZF_DEFAULT_COMMAND="fd -H --color=always"
 export FZF_CTRL_T_COMMAND="$FZF_CTRL_T_COMMAND"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # main
-alias g='git'; source /usr/share/bash-completion/completions/git; __git_complete g __git_main;
+# alias g='git'; source /usr/share/bash-completion/completions/git; __git_complete g __git_main;
 
 # Git Related
 alias gst="git status"

@@ -23,5 +23,14 @@ alias lx='ls -l'
 
 alias upup="sudo apt update && sudo apt upgrade"
 
-
 alias python="python3"
+
+sweb() {
+    open "https://www.bing.com/search?q=$@"
+}
+
+# short hand for history
+alias h='history'
+alias hl='history | less'
+alias hs='history | rg'
+alias hsi='history | rg -i'

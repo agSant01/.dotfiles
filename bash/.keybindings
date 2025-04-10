@@ -1,3 +1,7 @@
 #!/usr/bin/env bash
 
-bind '"\C-f":"tmux-sessionizer\n"'
+if [[ $(uname) -eq "Darwin" ]]; then
+    bindkey -s "^f" '$HOME/.local/scripts/tmux-sessionizer\n'
+else;
+    bind '"\C-f":"tmux-sessionizer\n"'
+fi

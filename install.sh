@@ -7,7 +7,7 @@ fi
 
 source $HOME/.dotfiles/colors.sh
 
-STOW_FOLDERS=(vim tmux bin nvm yarn bash gh fzf git fdfind perl)
+STOW_FOLDERS=(vim tmux bin nvm yarn bash zsh gh fzf git fdfind perl)
 STOW_DIR="$HOME"
 
 cp -L ~/.bashrc ~/.bashrc.bk

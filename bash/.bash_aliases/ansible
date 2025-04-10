@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+alias a='ansible '
+alias aver='ansible-version'
+alias aplaybook='ansible-playbook '
+alias ainv='ansible-inventory '
+alias adoc='ansible-doc '
+alias agal='ansible-galaxy '
+alias apull='ansible-pull '
+alias aval='ansible-vault'
+

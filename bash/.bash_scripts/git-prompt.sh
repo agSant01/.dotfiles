@@ -22,16 +22,16 @@ THEME_GIT_PROMPT_UNTRACKED="…"
 THEME_GIT_PROMPT_CLEAN="$BOLD$GREEN✔ "
 
 update_git_vars() {
-    _GIT_CURRENT_DIRECTORY=$(dirname ${BASH_SOURCE[0]})
-    _GIT_STATUS=`git status --porcelain --branch | perl $_GIT_CURRENT_DIRECTORY/git.pl`
-    _GIT_CURRENT_STATUS=($_GIT_STATUS)
+    _GIT_PARSER_DIRECTORY="$HOME/.bash_scripts"
+    _GIT_STATUS=`git status --porcelain --branch | perl $_GIT_PARSER_DIRECTORY/git.pl`
+    _GIT_CURRENT_STATUS=(${=_GIT_STATUS})
 
-    GIT_CHANGED=${_GIT_CURRENT_STATUS[0]}
-    GIT_CONFLICTS=${_GIT_CURRENT_STATUS[1]}
-    GIT_STAGED=${_GIT_CURRENT_STATUS[2]}
-    GIT_UNTRACKED=${_GIT_CURRENT_STATUS[3]}
-    GIT_AHEAD=${_GIT_CURRENT_STATUS[4]}
-    GIT_BEHIND=${_GIT_CURRENT_STATUS[5]}
+    GIT_CHANGED=${_GIT_CURRENT_STATUS[1]}
+    GIT_CONFLICTS=${_GIT_CURRENT_STATUS[2]}
+    GIT_STAGED=${_GIT_CURRENT_STATUS[3]}
+    GIT_UNTRACKED=${_GIT_CURRENT_STATUS[4]}
+    GIT_AHEAD=${_GIT_CURRENT_STATUS[5]}
+    GIT_BEHIND=${_GIT_CURRENT_STATUS[6]}
 }
 
 git_super_status() {
@@ -94,7 +94,7 @@ git_super_status() {
 
         PROMPT="${PROMPT}${RESET_COLOR}${THEME_GIT_PROMPT_SUFFIX}"
 
-        echo -en " $PROMPT"
+        echo -en "$PROMPT "
     fi
 }
 
