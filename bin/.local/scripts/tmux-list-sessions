@@ -1,10 +1,47 @@
 #!/usr/bin/env bash
 
+# Set up logging
+exec 1> >(tee -a "/tmp/tmux-list-sessions.log")
+exec 2>&1
+echo "=== Starting tmux-list-sessions at $(date) ==="
+
 TMUX_RUNNING=$(pgrep tmux)
 [ -z $TMUX_RUNNING ] && exit 0
 
-SELECTED_SESSION=$(tmux ls -F "#{session_id} #{host} / #{session_name} #{?session_attached,(attached),}" | sort | fzf-tmux --reverse --select-1 -p --cycle)
+# Get both query and selection from fzf
+SELECTED_SESSION=$(tmux ls -F "#{session_id} #{host} / #{session_name} #{?session_attached,(attached),}" | sort | fzf-tmux --reverse --select-1 -p --cycle --print-query)
 
-SELECTED_SESSION=$(echo $SELECTED_SESSION | cut -d " " -f 4)
+# Exit if no session was selected
+[ -z "$SELECTED_SESSION" ] && exit 0
 
-tmux switch -t $SELECTED_SESSION
+# When using --print-query, fzf outputs the query on first line and selection on second line
+# If user types a new name without selecting, only the query line is present
+QUERY=$(echo "$SELECTED_SESSION" | head -1)
+SELECTION=$(echo "$SELECTED_SESSION" | tail -1)
+
+echo "QUERY: $QUERY"
+echo "SELECTION: $SELECTION"
+
+# If selection is same as query, user typed a new name
+# Otherwise, user selected an existing session
+if [ "$QUERY" = "$SELECTION" ]; then
+    SELECTED_SESSION="$QUERY"
+    echo "Using typed session name: $SELECTED_SESSION"
+else
+    SELECTED_SESSION=$(echo "$SELECTION" | cut -d " " -f 4)
+    echo "Using selected session: $SELECTED_SESSION"
+fi
+
+# Check if session exists, if not create it in $HOME
+tmux has-session -t "$SELECTED_SESSION" 2>/dev/null
+if [ $? != 0 ]; then
+    # new session in $HOME
+    echo "Creating new session $SELECTED_SESSION in $HOME"
+    tmux new-session -d -s "$SELECTED_SESSION" -c "$HOME"
+fi
+
+# Switch to the session and exit successfully
+echo "Switching to session: $SELECTED_SESSION"
+tmux switch -t "$SELECTED_SESSION"
+echo "=== Finished tmux-list-sessions at $(date) ==="
+exit 0

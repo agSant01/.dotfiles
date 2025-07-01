@@ -91,6 +91,10 @@ source $HOME/.paths
 source "$HOME/.cargo/env"
 source $HOME/.keybindings
 source "$HOME/.dotfiles/colors.sh"
+if [[ ! -f "$HOME/.secrets" ]]; then
+  touch "$HOME/.secrets"
+fi
+source "$HOME/.secrets"
 
 # Alias definitions.
 # You may want to put all your additions into a separate file like

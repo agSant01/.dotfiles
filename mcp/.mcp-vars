@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+#  Github MCP Server Related
+export GITHUB_TOOLSETS="all"

@@ -72,7 +72,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # pnpm
-export PNPM_HOME="/Users/gsantiago/Library/pnpm"
+export PNPM_HOME="$HOME/Library/pnpm"
 case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
@@ -152,6 +152,10 @@ source $HOME/.env
 source $HOME/.paths
 [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
 source "$HOME/.keybindings"
+if [[ ! -f "$HOME/.secrets" ]]; then
+  touch "$HOME/.secrets"
+fi
+source "$HOME/.secrets"
 
 if [[ $(uname) -eq "Darwin" ]]; then
   eval "$(zoxide init zsh)"
@@ -181,3 +185,11 @@ _gt_yargs_completions()
 compdef _gt_yargs_completions gt
 ###-end-gt-completions-###
 
+
+# bun completions
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
+# The following lines have been added by Docker Desktop to enable Docker CLI completions.
+fpath=($HOME/.docker/completions $fpath)
+autoload -Uz compinit
+compinit
+# End of Docker CLI completions
