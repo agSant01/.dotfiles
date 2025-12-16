@@ -17,5 +17,3 @@
 	wt-clone = "!clone-bare"
 	wtl		 = worktree list -v
     open-remote = !gh repo view -w
-[core]
-	sshCommand = ssh -i ~/.ssh/id_ed25519_orbis_gh
