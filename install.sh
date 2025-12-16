@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 
+# ignore existing .bashrc.bk and .profile.bk files command and exit if they exist flag --ignore-existing-ok
 if [[ -e ~/.bashrc.bk ]] || [[ -e ~/.profile.bk ]]; then
     printf "%s\n" ".dotfiles: init error: Already have .bk files. Make sure you are not overriding previous backups." >&2;
+    
+    # 
+    if [[ "$1" == "--ignore-existing-ok" ]]; then
+        echo -e "$GREEN[WARNING]$RESET_COLOR Ignoring existing .bk files."
+        exit 0;
+    fi
     exit 1;
 fi
 
