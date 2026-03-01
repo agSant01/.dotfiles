@@ -67,20 +67,6 @@ zstyle ':omz:update' mode reminder  # just remind me to update when it's time
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-
-# pnpm
-export PNPM_HOME="$HOME/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-# pnpm end
-
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-
 # Which plugins would you like to load?
 # Standard plugins can be found in $ZSH/plugins/
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
@@ -150,21 +136,12 @@ alias resrc="source ~/.zshrc"
 
 source $HOME/.env
 source $HOME/.paths
-[ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
 source "$HOME/.keybindings"
 if [[ ! -f "$HOME/.secrets" ]]; then
   touch "$HOME/.secrets"
 fi
 source "$HOME/.secrets"
-
-if [[ $(uname) -eq "Darwin" ]]; then
-  eval "$(zoxide init zsh)"
-else;
-  eval "$(zoxide init bash)"
-fi
-
-# Generated for envman. Do not edit.
-[ -s "$HOME/.config/envman/load.sh" ] && source "$HOME/.config/envman/load.sh"
+source "$HOME/.shared-rc.sh"
 #compdef gt
 ###-begin-gt-completions-###
 #

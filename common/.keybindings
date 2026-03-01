@@ -1,7 +1,6 @@
-#!/usr/bin/env bash
-
-if [[ $(uname) -eq "Darwin" ]]; then
+# Keybindings for tmux-sessionizer: bindkey in zsh, bind in bash.
+if [[ -n "$ZSH_VERSION" ]]; then
     bindkey -s "^f" '$HOME/.local/scripts/tmux-sessionizer\n'
-else;
+else
     bind '"\C-f":"tmux-sessionizer\n"'
 fi

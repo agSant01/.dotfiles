@@ -88,13 +88,13 @@ export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quo
 
 source $HOME/.env
 source $HOME/.paths
-source "$HOME/.cargo/env"
 source $HOME/.keybindings
 source "$HOME/.dotfiles/colors.sh"
 if [[ ! -f "$HOME/.secrets" ]]; then
   touch "$HOME/.secrets"
 fi
 source "$HOME/.secrets"
+source "$HOME/.shared-rc.sh"
 
 # Alias definitions.
 # You may want to put all your additions into a separate file like
@@ -119,27 +119,15 @@ if ! shopt -oq posix; then
   fi
 fi
 
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
-
 if [[ -d $HOME/.bash_scripts ]]; then
     for scripts in $HOME/.bash_scripts/*.sh; do
         source $scripts
     done
 fi
 
-if [[ -d "$HOME/.local/modules" ]]; then
-    for file in $HOME/.local/modules/*; do
-        source $file
-    done
-fi
+export MODULAR_HOME="$HOME/.modular"
 
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-
-export MODULAR_HOME="/home/gbrl18/.modular"
-
-# Must go after imports of .bash_scripts/ and .local/modules
+# Must go after imports of .bash_scripts/
 # Must go before setup of PS1
 function cd() {
     # override actions Before cd'in to a directory go here
@@ -164,15 +152,3 @@ else
 fi
 unset color_prompt force_color_prompt
 
-eval "$(zoxide init bash)"
-
-# Generated for envman. Do not edit.
-[ -s "$HOME/.config/envman/load.sh" ] && source "$HOME/.config/envman/load.sh"
-
-# pnpm
-export PNPM_HOME="/home/gbrl/.local/share/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-# pnpm end

@@ -1,0 +1,6 @@
+# Ignore contents so overlay submodule dirs are not shown as untracked
+# when not yet added. Keep README and unfold script visible.
+*
+!.gitignore
+!README.md
+!unfold.sh

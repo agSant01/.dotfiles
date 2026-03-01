@@ -1,2 +1,5 @@
 # GH CLI
 gh/.config/gh/hosts.yml
+
+# App-generated state under stowed .local (avoid tracking when using --no-folding)
+bin/.local/state/
