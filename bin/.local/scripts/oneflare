@@ -1,0 +1,999 @@
+#!/usr/bin/env bash
+# usage: ./oneflare [--local|--quick] file1.zip [file2.zip ...]
+#   --local   serve only on localhost (no tunnel)
+#   --quick   use Cloudflare free quick tunnel (*.trycloudflare.com, no config or domain needed)
+
+set -e
+
+## Cloudflare Tunnel Configuration
+# Required when not using --local: set ONEFLARE_TUNNEL_DOMAIN (e.g. example.com)
+TUNNEL_NAME="${ONEFLARE_TUNNEL_NAME:-oneflare}"
+TUNNEL_CONFIG_DIR="${ONEFLARE_CONFIG_DIR:-$HOME/.cloudflared}"
+TUNNEL_CONFIG_FILE="$TUNNEL_CONFIG_DIR/$TUNNEL_NAME.yml"
+
+# Colors and styles
+BOLD='\033[1m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+NC='\033[0m' # No Color
+DIM='\033[2m'
+
+# Icons
+CHECK='✓'
+CROSS='✗'
+ARROW='→'
+FOLDER='📁'
+FILE_ICON='📄'
+SPINNER_CHARS='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+
+PORT=8080
+
+LOCAL_ONLY=0
+QUICK_TUNNEL=0
+if [[ $# -gt 0 && "$1" == "--local" ]]; then
+    LOCAL_ONLY=1
+    shift
+fi
+if [[ $# -gt 0 && "$1" == "--quick" ]]; then
+    QUICK_TUNNEL=1
+    shift
+fi
+
+# Check if files are provided
+[ $# -eq 0 ] && {
+    echo -e "${RED}${CROSS}${NC} No files provided" >&2
+    echo -e "${DIM}Usage: $0 file1 [file2 ...]${NC}" >&2
+    exit 1
+}
+
+# Validate all files exist and collect them
+FILES=()
+MISSING_FILES=()
+for file in "$@"; do
+    if [ -f "$file" ]; then
+        FILES+=("$file")
+    else
+        MISSING_FILES+=("$file")
+    fi
+done
+
+[ ${#MISSING_FILES[@]} -gt 0 ] && {
+    echo -e "${RED}${CROSS}${NC} File(s) not found:" >&2
+    for file in "${MISSING_FILES[@]}"; do
+        echo -e "   ${BOLD}$file${NC}" >&2
+    done
+    exit 1
+}
+
+[ ${#FILES[@]} -eq 0 ] && {
+    echo -e "${RED}${CROSS}${NC} No valid files provided" >&2
+    exit 1
+}
+
+TOKEN="$(openssl rand -hex 16)"
+
+# Signal flag for graceful shutdown
+SIGNAL_RECEIVED=0
+SIGNAL_FLAG=""
+
+# Function to clean up on exit
+cleanup() {
+    SIGNAL_RECEIVED=1
+    # Signal spinner to stop if it exists
+    [ -n "$SIGNAL_FLAG" ] && touch "$SIGNAL_FLAG" 2>/dev/null || true
+    echo -e "\n${YELLOW}${ARROW}${NC} Stopping server and tunnel..."
+    kill "$PY_PID" "$CF_PID" "$SPINNER_PID" 2>/dev/null || true
+    [ -n "$SIGNAL_FLAG" ] && rm -f "$SIGNAL_FLAG" 2>/dev/null || true
+    echo -e "${GREEN}${CHECK}${NC} Cleanup complete"
+    exit
+}
+trap cleanup SIGINT SIGTERM
+
+python3 - "$TOKEN" "${FILES[@]}" <<'EOF' &
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+import sys, os
+from urllib.parse import urlparse, parse_qs, unquote, quote
+import mimetypes
+
+TOKEN = sys.argv[1]
+FILES = sys.argv[2:]
+
+# Create a mapping of basenames to full paths
+FILE_MAP = {os.path.basename(f): f for f in FILES}
+
+def format_size(size):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size < 1024.0:
+            return f"{size:.1f} {unit}"
+        size /= 1024.0
+    return f"{size:.1f} TB"
+
+def is_text_file(filepath):
+    """Check if file is a text file that can be viewed"""
+    text_extensions = {'.txt', '.md', '.json', '.xml', '.html', '.css', '.js',
+                       '.py', '.sh', '.bash', '.zsh', '.yaml', '.yml', '.toml',
+                       '.ini', '.conf', '.log', '.csv', '.tsv', '.ts', '.jsx',
+                       '.tsx', '.vue', '.svelte', '.go', '.rs', '.java', '.c',
+                       '.cpp', '.h', '.hpp', '.php', '.rb', '.swift', '.kt',
+                       '.dart', '.lua', '.pl', '.r', '.sql', '.graphql', '.gql'}
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext in text_extensions:
+        return True
+    # Check MIME type
+    mime_type, _ = mimetypes.guess_type(filepath)
+    if mime_type and mime_type.startswith('text/'):
+        return True
+    # Check if file is small enough and likely text
+    try:
+        if os.path.getsize(filepath) < 5 * 1024 * 1024:  # 5MB limit
+            with open(filepath, 'rb') as f:
+                chunk = f.read(512)
+                # Check if mostly printable ASCII
+                printable = sum(1 for b in chunk if 32 <= b <= 126 or b in [9, 10, 13])
+                return printable > len(chunk) * 0.8
+    except:
+        pass
+    return False
+
+def is_image_file(filepath):
+    """Check if file is an image"""
+    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp',
+                        '.svg', '.ico', '.tiff', '.tif'}
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext in image_extensions:
+        return True
+    mime_type, _ = mimetypes.guess_type(filepath)
+    return mime_type and mime_type.startswith('image/')
+
+def generate_file_viewer_html(filename, content, filepath, token):
+    """Generate HTML viewer for text files (used for direct view URL access)"""
+    # Escape HTML
+    import html
+    escaped_content = html.escape(content)
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{filename} - File Viewer</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Code', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            line-height: 1.6;
+        }}
+        .header {{
+            background: #252526;
+            border-bottom: 1px solid #3e3e42;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }}
+        .header-left {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }}
+        .back-btn {{
+            background: #0e639c;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.2s;
+        }}
+        .back-btn:hover {{
+            background: #1177bb;
+        }}
+        .file-info {{
+            color: #cccccc;
+        }}
+        .file-name {{
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 2px;
+        }}
+        .file-path {{
+            font-size: 12px;
+            color: #858585;
+            font-family: monospace;
+        }}
+        .actions {{
+            display: flex;
+            gap: 8px;
+        }}
+        .btn {{
+            background: #0e639c;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.2s;
+            border: none;
+            cursor: pointer;
+        }}
+        .btn:hover {{
+            background: #1177bb;
+        }}
+        .btn-secondary {{
+            background: #3e3e42;
+        }}
+        .btn-secondary:hover {{
+            background: #4e4e52;
+        }}
+        .content {{
+            padding: 24px;
+            max-width: 100%;
+            overflow-x: auto;
+        }}
+        pre {{
+            background: #1e1e1e;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }}
+        code {{
+            font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+            color: #d4d4d4;
+        }}
+        .line-numbers {{
+            color: #858585;
+            margin-right: 16px;
+            user-select: none;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="/?token={token}" class="back-btn">← Back</a>
+            <div class="file-info">
+                <div class="file-name">📄 {html.escape(filename)}</div>
+                <div class="file-path">{html.escape(filepath)}</div>
+            </div>
+        </div>
+        <div class="actions">
+            <a href="/{filename}?token={token}" class="btn">Download</a>
+        </div>
+    </div>
+    <div class="content">
+        <pre><code>{escaped_content}</code></pre>
+    </div>
+</body>
+</html>
+"""
+    return html_content
+
+def get_language_from_filename(filename):
+    """Get language identifier for syntax highlighting"""
+    ext = os.path.splitext(filename)[1].lower()
+    lang_map = {
+        '.py': 'python', '.js': 'javascript', '.ts': 'typescript', '.jsx': 'jsx', '.tsx': 'tsx',
+        '.html': 'html', '.css': 'css', '.json': 'json', '.xml': 'xml',
+        '.yaml': 'yaml', '.yml': 'yaml', '.md': 'markdown',
+        '.sh': 'bash', '.bash': 'bash', '.zsh': 'bash',
+        '.go': 'go', '.rs': 'rust', '.java': 'java', '.c': 'c',
+        '.cpp': 'cpp', '.h': 'c', '.hpp': 'cpp', '.php': 'php', '.rb': 'ruby',
+        '.sql': 'sql', '.swift': 'swift', '.kt': 'kotlin', '.dart': 'dart',
+        '.lua': 'lua', '.pl': 'perl', '.r': 'r', '.graphql': 'graphql', '.gql': 'graphql',
+        '.toml': 'toml', '.ini': 'ini', '.conf': 'nginx', '.log': 'log'
+    }
+    return lang_map.get(ext, 'plaintext')
+
+def generate_listing_html(files, token, base_url):
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Share</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: #0d1117;
+            color: #c9d1d9;
+        }}
+
+        .layout {{
+            display: flex;
+            height: 100vh;
+        }}
+
+        /* Sidebar */
+        .sidebar {{
+            width: 320px;
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }}
+
+        .sidebar-header {{
+            padding: 16px;
+            border-bottom: 1px solid #30363d;
+        }}
+
+        .sidebar-header h1 {{
+            font-size: 16px;
+            font-weight: 600;
+            color: #f0f6fc;
+            margin-bottom: 4px;
+        }}
+
+        .sidebar-header p {{
+            font-size: 12px;
+            color: #8b949e;
+        }}
+
+        .files-list {{
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }}
+
+        .file-item {{
+            padding: 12px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #161b22;
+        }}
+
+        .file-item:hover {{
+            background: #1c2128;
+            border-color: #30363d;
+        }}
+
+        .file-item.active {{
+            background: #1c2128;
+            border-color: #1f6feb;
+        }}
+
+        .file-name-row {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }}
+
+        .file-icon {{
+            font-size: 16px;
+            flex-shrink: 0;
+        }}
+
+        .file-name {{
+            font-weight: 500;
+            font-size: 13px;
+            color: #f0f6fc;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }}
+
+        .file-info {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }}
+
+        .file-size {{
+            font-size: 11px;
+            color: #8b949e;
+        }}
+
+        .file-actions {{
+            display: flex;
+            gap: 6px;
+        }}
+
+        .btn {{
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }}
+
+        .btn-download {{
+            background: #238636;
+            color: #fff;
+        }}
+
+        .btn-download:hover {{
+            background: #2ea043;
+        }}
+
+        .btn-copy {{
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+        }}
+
+        .btn-copy:hover {{
+            background: #30363d;
+            border-color: #484f58;
+        }}
+
+        .btn-copy.copied {{
+            background: #238636;
+            border-color: #238636;
+            color: #fff;
+        }}
+
+        /* Viewer */
+        .viewer {{
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0d1117;
+            overflow: hidden;
+        }}
+
+        .viewer-header {{
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 12px 16px;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }}
+
+        .viewer-title {{
+            font-size: 14px;
+            font-weight: 500;
+            color: #f0f6fc;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }}
+
+        .viewer-empty-state {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            color: #8b949e;
+            font-size: 14px;
+        }}
+
+        .viewer-content {{
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background: #0d1117;
+            padding: 0;
+            margin: 0;
+        }}
+
+        /* Code Viewer */
+        .code-wrapper {{
+            position: relative;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }}
+
+        .code-wrapper pre {{
+            margin: 0;
+            padding: 0;
+            background: #0d1117;
+            position: relative;
+            overflow-x: auto;
+            overflow-y: visible;
+        }}
+
+        .code-wrapper code {{
+            display: block;
+            padding: 16px 16px 16px 56px;
+            margin: 0;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #c9d1d9;
+            white-space: pre;
+            tab-size: 4;
+            word-wrap: normal;
+            overflow-wrap: normal;
+            background: transparent;
+        }}
+
+        .code-wrapper code.hljs {{
+            padding: 16px 16px 16px 56px;
+            background: transparent;
+        }}
+
+        .code-wrapper code.hljs * {{
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+        }}
+
+        .code-wrapper .line-numbers {{
+            position: absolute;
+            left: 0;
+            top: 16px;
+            width: 48px;
+            padding: 0 16px 0 0;
+            margin: 0;
+            text-align: right;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #6e7681;
+            user-select: none;
+            pointer-events: none;
+            border-right: 1px solid #21262d;
+            background: #0d1117;
+            box-sizing: border-box;
+            z-index: 1;
+        }}
+
+        .code-wrapper .line-number {{
+            display: block;
+            height: 1.5em;
+            line-height: 1.5;
+            padding: 0px 12px 0px 12px;
+            margin: 0;
+            box-sizing: border-box;
+        }}
+
+        /* Image Viewer */
+        .image-viewer {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            min-height: 100%;
+        }}
+
+        .image-viewer img {{
+            max-width: 100%;
+            max-height: calc(100vh - 80px);
+            border-radius: 6px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }}
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {{
+            width: 12px;
+            height: 12px;
+        }}
+
+        ::-webkit-scrollbar-track {{
+            background: #0d1117;
+        }}
+
+        ::-webkit-scrollbar-thumb {{
+            background: #30363d;
+            border-radius: 6px;
+            border: 2px solid #0d1117;
+        }}
+
+        ::-webkit-scrollbar-thumb:hover {{
+            background: #484f58;
+        }}
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>📦 Files</h1>
+                <p>{len(files)} file{'s' if len(files) != 1 else ''} available</p>
+            </div>
+            <div class="files-list">
+"""
+    if not files:
+        html += '<div class="viewer-empty-state">No files available</div>'
+    else:
+        for filename, size, can_view, is_image, lang in files:
+            file_url = f"{base_url}/{filename}?token={token}"
+            download_url = f"{base_url}/{filename}?token={token}"
+            view_url = f"{base_url}/{filename}?token={token}&view=1"
+            icon = "🖼️" if is_image else "📄"
+            html += f"""
+                <div class="file-item" data-filename="{filename}" data-can-view="{'true' if can_view else 'false'}" data-is-image="{'true' if is_image else 'false'}" data-lang="{lang}" data-view-url="{view_url}" data-download-url="{download_url}">
+                    <div class="file-name-row">
+                        <span class="file-icon">{icon}</span>
+                        <span class="file-name">{filename}</span>
+                    </div>
+                    <div class="file-info">
+                        <span class="file-size">{size}</span>
+                        <div class="file-actions">
+                            <a href="{download_url}" class="btn btn-download" onclick="event.stopPropagation();" download>Download</a>
+                            <button class="btn btn-copy" onclick="event.stopPropagation(); copyUrl('{file_url}', this)">Copy Link</button>
+                        </div>
+                    </div>
+                </div>
+"""
+    html += """
+            </div>
+        </div>
+        <div class="viewer">
+            <div class="viewer-header">
+                <div class="viewer-title" id="viewer-title">Select a file to view</div>
+            </div>
+            <div class="viewer-content" id="viewer-content">
+                <div class="viewer-empty-state">Select a file from the list to view its contents</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const fileItems = document.querySelectorAll('.file-item');
+        const viewerContent = document.getElementById('viewer-content');
+        const viewerTitle = document.getElementById('viewer-title');
+
+        fileItems.forEach(item => {{
+            item.addEventListener('click', () => {{
+                // Update active state
+                fileItems.forEach(f => f.classList.remove('active'));
+                item.classList.add('active');
+
+                const filename = item.dataset.filename;
+                const canView = item.dataset.canView === 'true';
+                const isImage = item.dataset.isImage === 'true';
+                const lang = item.dataset.lang || 'plaintext';
+                const viewUrl = item.dataset.viewUrl;
+
+                viewerTitle.textContent = filename;
+
+                if (canView) {{
+                    if (isImage) {{
+                        viewerContent.innerHTML = '<div class="image-viewer"><img src="' + viewUrl + '" alt="' + filename + '" /></div>';
+                    }} else {{
+                        viewerContent.innerHTML = '<div class="viewer-empty-state">Loading...</div>';
+                        const textUrl = viewUrl + '&format=text';
+
+                        fetch(textUrl)
+                            .then(response => {{
+                                if (!response.ok) throw new Error('Failed to load file: ' + response.status);
+                                return response.text();
+                            }})
+                            .then(text => {{
+                                if (typeof text !== 'string') {{
+                                    throw new Error('Invalid response type');
+                                }}
+
+                                // Preserve the original text exactly
+                                const lines = text.split('\\n');
+                                const lineCount = lines.length;
+
+                                // Handle empty files
+                                if (lineCount === 0 || (lineCount === 1 && text === '')) {{
+                                    viewerContent.innerHTML = '<div class="viewer-empty-state">File is empty</div>';
+                                    return;
+                                }}
+
+                                const wrapper = document.createElement('div');
+                                wrapper.className = 'code-wrapper';
+
+                                // Create line numbers first
+                                const lineNumbers = document.createElement('div');
+                                lineNumbers.className = 'line-numbers';
+                                for (let i = 1; i <= lineCount; i++) {{
+                                    const lineNum = document.createElement('span');
+                                    lineNum.className = 'line-number';
+                                    lineNum.textContent = i;
+                                    lineNumbers.appendChild(lineNum);
+                                }}
+                                wrapper.appendChild(lineNumbers);
+
+                                const pre = document.createElement('pre');
+                                const code = document.createElement('code');
+                                code.className = 'language-' + lang;
+                                code.textContent = text;
+                                pre.appendChild(code);
+                                wrapper.appendChild(pre);
+
+                                viewerContent.innerHTML = '';
+                                viewerContent.appendChild(wrapper);
+
+                                // Apply syntax highlighting after DOM is ready
+                                setTimeout(() => {{
+                                    if (window.hljs && lang !== 'plaintext') {{
+                                        try {{
+                                            hljs.highlightElement(code);
+                                        }} catch (e) {{
+                                            console.warn('Highlight.js error:', e);
+                                            // If highlighting fails, code is already displayed
+                                        }}
+                                    }}
+                                }}, 10);
+                            }})
+                            .catch(err => {{
+                                console.error('Error loading file:', err);
+                                viewerContent.innerHTML = '<div class="viewer-empty-state">Error loading file: ' + err.message + '</div>';
+                            }});
+                    }}
+                }} else {{
+                    viewerContent.innerHTML = '<div class="viewer-empty-state">This file cannot be viewed in the browser</div>';
+                }}
+            }});
+        }});
+
+        function copyUrl(url, btn) {{
+            navigator.clipboard.writeText(url).then(() => {{
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {{
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy:', err);
+            }});
+        }}
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/jsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/tsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/markdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/php.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/ruby.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/swift.min.js"></script>
+</body>
+</html>
+"""
+    return html
+
+class Handler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+
+        # Check token
+        if qs.get("token", [None])[0] != TOKEN:
+            self.send_error(403)
+            return
+
+        path = unquote(parsed.path)
+
+        # Serve directory listing
+        if path == "/" or path == "":
+            files_info = []
+            for basename, fullpath in FILE_MAP.items():
+                if os.path.exists(fullpath):
+                    size = os.path.getsize(fullpath)
+                    can_view = is_text_file(fullpath) or is_image_file(fullpath)
+                    is_image = is_image_file(fullpath)
+                    lang = get_language_from_filename(basename) if can_view and not is_image else ''
+                    files_info.append((basename, format_size(size), can_view, is_image, lang))
+
+            # Get base URL from request
+            host = self.headers.get('Host', 'localhost:8080')
+            scheme = 'https' if self.headers.get('X-Forwarded-Proto') == 'https' else 'http'
+            base_url = f"{scheme}://{host}"
+
+            html = generate_listing_html(files_info, TOKEN, base_url)
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            self.wfile.write(html.encode())
+            return
+
+        # Serve individual file
+        filename = path.lstrip("/")
+        if filename in FILE_MAP:
+            filepath = FILE_MAP[filename]
+            if os.path.exists(filepath):
+                # Check if view mode is requested
+                view_mode = qs.get("view", [None])[0] == "1"
+
+                if view_mode and is_text_file(filepath):
+                    # Check if plain text is requested (for AJAX)
+                    format_type = qs.get("format", [None])[0]
+                    try:
+                        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                            content = f.read()
+
+                        if format_type == "text":
+                            # Return plain text for AJAX requests
+                            self.send_response(200)
+                            self.send_header("Content-type", "text/plain; charset=utf-8")
+                            self.send_header("Access-Control-Allow-Origin", "*")
+                            self.end_headers()
+                            self.wfile.write(content.encode('utf-8'))
+                            return
+                        else:
+                            # Return HTML viewer page
+                            html = generate_file_viewer_html(filename, content, filepath, TOKEN)
+                            self.send_response(200)
+                            self.send_header("Content-type", "text/html")
+                            self.end_headers()
+                            self.wfile.write(html.encode())
+                            return
+                    except Exception as e:
+                        # Fall through to regular file serving
+                        pass
+
+                elif view_mode and is_image_file(filepath):
+                    # Serve image inline
+                    mime_type, _ = mimetypes.guess_type(filepath)
+                    if not mime_type:
+                        mime_type = 'image/jpeg'
+                    with open(filepath, 'rb') as f:
+                        content = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-type", mime_type)
+                    self.end_headers()
+                    self.wfile.write(content)
+                    return
+
+                # Regular file download - force download with Content-Disposition
+                mime_type, _ = mimetypes.guess_type(filepath)
+                if not mime_type:
+                    mime_type = 'application/octet-stream'
+
+                with open(filepath, 'rb') as f:
+                    content = f.read()
+
+                # Escape filename for Content-Disposition header
+                safe_filename = quote(filename)
+
+                self.send_response(200)
+                self.send_header("Content-type", mime_type)
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"; filename*=UTF-8\'\'{safe_filename}')
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+                return
+
+        self.send_error(404)
+
+    def log_message(self, format, *args):
+        pass  # Suppress default logging
+
+HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+EOF
+
+PY_PID=$!   # save Python server PID
+
+echo -e "${CYAN}${ARROW}${NC} Starting local server on port ${BOLD}${PORT}${NC}..."
+sleep 0.5
+
+# Display files being shared
+echo -e "${GREEN}${CHECK}${NC} Server ready"
+echo -e "${DIM}   Sharing ${BOLD}${#FILES[@]}${NC} file(s):${NC}"
+for file in "${FILES[@]}"; do
+    filename=$(basename "$file")
+    size=$(du -h "$file" | cut -f1)
+    echo -e "${DIM}   ${FILE_ICON} ${BOLD}${filename}${NC} (${size})${NC}"
+done
+
+# flag for only local access
+if [[ $LOCAL_ONLY -eq 1 ]]; then
+    echo "Local URL: http://localhost:$PORT/?token=$TOKEN"
+    wait $PY_PID
+    exit 0
+fi
+
+# Require tunnel domain when using named tunnel (not --quick)
+if [[ $QUICK_TUNNEL -eq 0 && -z "${ONEFLARE_TUNNEL_DOMAIN:-}" ]]; then
+    echo -e "${RED}${CROSS}${NC} ONEFLARE_TUNNEL_DOMAIN is not set" >&2
+    echo -e "${DIM}Set your tunnel domain in the environment, e.g.:${NC}" >&2
+    echo -e "${DIM}   export ONEFLARE_TUNNEL_DOMAIN=yourdomain.com${NC}" >&2
+    echo -e "${DIM}Or run with ${BOLD}--quick${NC} for a free trycloudflare.com URL, or ${BOLD}--local${NC} for localhost only.${NC}" >&2
+    kill "$PY_PID" 2>/dev/null || true
+    exit 1
+fi
+
+# Start cloudflared in background and capture output
+CF_LOG=$(mktemp)
+echo "CF_LOG: $CF_LOG"
+SIGNAL_FLAG=$(mktemp)
+
+if [[ $QUICK_TUNNEL -eq 1 ]]; then
+    # CF quick tunnel: no config, get random trycloudflare.com URL from output
+    cloudflared tunnel --url "http://127.0.0.1:$PORT" >"$CF_LOG" 2>&1 &
+    CF_PID=$!
+    echo -e "${CYAN}${ARROW}${NC} Starting Cloudflare quick tunnel..."
+    for i in {1..40}; do
+        URL=$(grep -oE 'https://[^[:space:]]+\.trycloudflare\.com' "$CF_LOG" 2>/dev/null | head -1)
+        [[ -n "$URL" ]] && break
+        sleep 0.5
+    done
+    if [[ -z "$URL" ]]; then
+        echo -e "${RED}${CROSS}${NC} Failed to get quick tunnel URL from cloudflared" >&2
+        kill "$PY_PID" "$CF_PID" 2>/dev/null || true
+        exit 1
+    fi
+else
+    cloudflared tunnel --config "$TUNNEL_CONFIG_FILE" run "$TUNNEL_NAME" >"$CF_LOG" 2>&1 &
+    CF_PID=$!
+    URL="https://${TUNNEL_NAME}.${ONEFLARE_TUNNEL_DOMAIN}"
+fi
+
+echo -e "\r${GREEN}${CHECK}${NC} Tunnel established${NC}"
+
+sleep 0.3
+echo ""
+echo -e "${BOLD}${GREEN}${CHECK} Ready to share!${NC}"
+echo ""
+
+# Show directory listing URL
+echo -e "${CYAN}${FOLDER}${NC} ${BOLD}Directory:${NC}"
+echo -e "   ${BLUE}$URL/?token=$TOKEN${NC}"
+echo ""
+
+# Show individual file URLs
+if [ ${#FILES[@]} -eq 1 ]; then
+    filename=$(basename "${FILES[0]}")
+    echo -e "${CYAN}${FILE_ICON}${NC} ${BOLD}File URL:${NC}"
+    echo -e "   ${BLUE}$URL/$filename?token=$TOKEN${NC}"
+else
+    echo -e "${CYAN}${FILE_ICON}${NC} ${BOLD}Individual files:${NC}"
+    for file in "${FILES[@]}"; do
+        filename=$(basename "$file")
+        echo -e "   ${BLUE}$URL/$filename?token=$TOKEN${NC}"
+    done
+fi
+
+echo ""
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${DIM}Quick download commands:${NC}"
+if [ ${#FILES[@]} -eq 1 ]; then
+    filename=$(basename "${FILES[0]}")
+    echo -e "${DIM}   curl -O \"$URL/$filename?token=$TOKEN\"${NC}"
+else
+    for file in "${FILES[@]}"; do
+        filename=$(basename "$file")
+        echo -e "${DIM}   curl -O \"$URL/$filename?token=$TOKEN\"${NC}"
+    done
+fi
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+# Wait for both processes
+wait "$PY_PID" "$CF_PID"
