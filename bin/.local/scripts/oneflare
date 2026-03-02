@@ -96,14 +96,19 @@ trap cleanup SIGINT SIGTERM
 python3 - "$TOKEN" "${FILES[@]}" <<'EOF' &
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 import sys, os
+import html as _html
 from urllib.parse import urlparse, parse_qs, unquote, quote
 import mimetypes
 
 TOKEN = sys.argv[1]
 FILES = sys.argv[2:]
 
-# Create a mapping of basenames to full paths
-FILE_MAP = {os.path.basename(f): f for f in FILES}
+# Map full path -> full path (use full path as key so same basenames don't overwrite)
+FILE_MAP = {os.path.abspath(f): f for f in FILES}
+
+def path_to_url_segment(filepath):
+    """URL-safe segment for a file path (unique per full path)."""
+    return quote(os.path.abspath(filepath), safe='')
 
 def format_size(size):
     for unit in ['B', 'KB', 'MB', 'GB']:
@@ -149,17 +154,16 @@ def is_image_file(filepath):
     mime_type, _ = mimetypes.guess_type(filepath)
     return mime_type and mime_type.startswith('image/')
 
-def generate_file_viewer_html(filename, content, filepath, token):
+def generate_file_viewer_html(filename, content, filepath, token, url_segment=None):
     """Generate HTML viewer for text files (used for direct view URL access)"""
-    # Escape HTML
-    import html
-    escaped_content = html.escape(content)
+    escaped_content = _html.escape(content)
 
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1e1e1e">
     <title>{filename} - File Viewer</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -168,14 +172,17 @@ def generate_file_viewer_html(filename, content, filepath, token):
             background: #1e1e1e;
             color: #d4d4d4;
             line-height: 1.6;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         }}
         .header {{
             background: #252526;
             border-bottom: 1px solid #3e3e42;
-            padding: 16px 24px;
+            padding: 12px 16px;
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
+            gap: 8px;
             position: sticky;
             top: 0;
             z-index: 100;
@@ -184,15 +191,20 @@ def generate_file_viewer_html(filename, content, filepath, token):
             display: flex;
             align-items: center;
             gap: 12px;
+            min-width: 0;
+            flex: 1;
         }}
         .back-btn {{
             background: #0e639c;
             color: white;
-            padding: 8px 16px;
-            border-radius: 4px;
+            padding: 8px 14px;
+            border-radius: 6px;
             text-decoration: none;
             font-size: 14px;
             transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            flex-shrink: 0;
         }}
         .back-btn:hover {{
             background: #1177bb;
@@ -200,30 +212,40 @@ def generate_file_viewer_html(filename, content, filepath, token):
         .file-info {{
             color: #cccccc;
         }}
+        .file-info {{ min-width: 0; overflow: hidden; }}
         .file-name {{
             font-weight: 600;
             font-size: 16px;
             margin-bottom: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }}
         .file-path {{
             font-size: 12px;
             color: #858585;
             font-family: monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }}
         .actions {{
             display: flex;
             gap: 8px;
+            flex-shrink: 0;
         }}
         .btn {{
             background: #0e639c;
             color: white;
-            padding: 8px 16px;
-            border-radius: 4px;
+            padding: 8px 14px;
+            border-radius: 6px;
             text-decoration: none;
             font-size: 14px;
             transition: background 0.2s;
             border: none;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
         }}
         .btn:hover {{
             background: #1177bb;
@@ -235,9 +257,10 @@ def generate_file_viewer_html(filename, content, filepath, token):
             background: #4e4e52;
         }}
         .content {{
-            padding: 24px;
+            padding: 16px;
             max-width: 100%;
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }}
         pre {{
             background: #1e1e1e;
@@ -263,12 +286,12 @@ def generate_file_viewer_html(filename, content, filepath, token):
         <div class="header-left">
             <a href="/?token={token}" class="back-btn">← Back</a>
             <div class="file-info">
-                <div class="file-name">📄 {html.escape(filename)}</div>
-                <div class="file-path">{html.escape(filepath)}</div>
+                <div class="file-name">📄 {_html.escape(filename)}</div>
+                <div class="file-path">{_html.escape(filepath)}</div>
             </div>
         </div>
         <div class="actions">
-            <a href="/{filename}?token={token}" class="btn">Download</a>
+            <a href="/{url_segment or path_to_url_segment(filepath)}?token={token}" class="btn">Download</a>
         </div>
     </div>
     <div class="content">
@@ -300,7 +323,8 @@ def generate_listing_html(files, token, base_url):
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0d1117">
     <title>File Share</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <style>
@@ -309,19 +333,23 @@ def generate_listing_html(files, token, base_url):
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             height: 100vh;
+            height: 100dvh;
             overflow: hidden;
             background: #0d1117;
             color: #c9d1d9;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         }}
 
         .layout {{
             display: flex;
-            height: 100vh;
+            height: 100%;
+            position: relative;
         }}
 
         /* Sidebar */
         .sidebar {{
             width: 320px;
+            max-width: 85vw;
             background: #161b22;
             border-right: 1px solid #30363d;
             display: flex;
@@ -350,6 +378,7 @@ def generate_listing_html(files, token, base_url):
             flex: 1;
             overflow-y: auto;
             padding: 8px;
+            -webkit-overflow-scrolling: touch;
         }}
 
         .file-item {{
@@ -360,6 +389,7 @@ def generate_listing_html(files, token, base_url):
             cursor: pointer;
             transition: all 0.2s ease;
             background: #161b22;
+            -webkit-tap-highlight-color: transparent;
         }}
 
         .file-item:hover {{
@@ -413,17 +443,20 @@ def generate_listing_html(files, token, base_url):
         }}
 
         .btn {{
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 11px;
+            padding: 8px 12px;
+            min-height: 36px;
+            border-radius: 6px;
+            font-size: 13px;
             font-weight: 500;
             border: none;
             cursor: pointer;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             transition: all 0.2s ease;
             white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
         }}
 
         .btn-download {{
@@ -500,6 +533,7 @@ def generate_listing_html(files, token, base_url):
             background: #0d1117;
             padding: 0;
             margin: 0;
+            -webkit-overflow-scrolling: touch;
         }}
 
         /* Code Viewer */
@@ -609,10 +643,73 @@ def generate_listing_html(files, token, base_url):
         ::-webkit-scrollbar-thumb:hover {{
             background: #484f58;
         }}
+
+        /* Mobile: drawer sidebar + full-width viewer */
+        @media (max-width: 768px) {{
+            .sidebar {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                z-index: 100;
+                width: min(320px, 100vw - 48px);
+                max-width: none;
+                transform: translateX(-100%);
+                transition: transform 0.25s ease, box-shadow 0.25s ease;
+                box-shadow: none;
+            }}
+            .layout.sidebar-open .sidebar {{
+                transform: translateX(0);
+                box-shadow: 8px 0 24px rgba(0,0,0,0.4);
+            }}
+            .sidebar-overlay {{
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 99;
+                opacity: 0;
+                transition: opacity 0.25s ease;
+            }}
+            .layout.sidebar-open .sidebar-overlay {{
+                display: block;
+                opacity: 1;
+            }}
+            .viewer {{
+                width: 100%;
+            }}
+            .viewer-header {{
+                padding-left: 8px;
+                padding-right: 8px;
+            }}
+            .btn-files-toggle {{
+                display: inline-flex;
+                margin-right: 8px;
+                flex-shrink: 0;
+            }}
+            .code-wrapper code {{
+                padding: 12px 12px 12px 44px;
+                font-size: 13px;
+            }}
+            .code-wrapper code.hljs {{
+                padding: 12px 12px 12px 44px;
+            }}
+            .code-wrapper .line-numbers {{
+                width: 40px;
+                padding: 0 8px 0 0;
+            }}
+        }}
+
+        @media (min-width: 769px) {{
+            .btn-files-toggle {{
+                display: none;
+            }}
+        }}
     </style>
 </head>
 <body>
     <div class="layout">
+        <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
         <div class="sidebar">
             <div class="sidebar-header">
                 <h1>📦 Files</h1>
@@ -623,16 +720,17 @@ def generate_listing_html(files, token, base_url):
     if not files:
         html += '<div class="viewer-empty-state">No files available</div>'
     else:
-        for filename, size, can_view, is_image, lang in files:
-            file_url = f"{base_url}/{filename}?token={token}"
-            download_url = f"{base_url}/{filename}?token={token}"
-            view_url = f"{base_url}/{filename}?token={token}&view=1"
+        for display_path, url_segment, size, can_view, is_image, lang in files:
+            file_url = f"{base_url}/{url_segment}?token={token}"
+            download_url = f"{base_url}/{url_segment}?token={token}"
+            view_url = f"{base_url}/{url_segment}?token={token}&view=1"
             icon = "🖼️" if is_image else "📄"
+            display_escaped = _html.escape(display_path)
             html += f"""
-                <div class="file-item" data-filename="{filename}" data-can-view="{'true' if can_view else 'false'}" data-is-image="{'true' if is_image else 'false'}" data-lang="{lang}" data-view-url="{view_url}" data-download-url="{download_url}">
+                <div class="file-item" data-filename="{display_escaped}" data-can-view="{'true' if can_view else 'false'}" data-is-image="{'true' if is_image else 'false'}" data-lang="{lang}" data-view-url="{view_url}" data-download-url="{download_url}">
                     <div class="file-name-row">
                         <span class="file-icon">{icon}</span>
-                        <span class="file-name">{filename}</span>
+                        <span class="file-name" title="{display_escaped}">{display_escaped}</span>
                     </div>
                     <div class="file-info">
                         <span class="file-size">{size}</span>
@@ -648,6 +746,7 @@ def generate_listing_html(files, token, base_url):
         </div>
         <div class="viewer">
             <div class="viewer-header">
+                <button type="button" class="btn btn-files-toggle" id="btn-files-toggle" aria-label="Open file list">📂 Files</button>
                 <div class="viewer-title" id="viewer-title">Select a file to view</div>
             </div>
             <div class="viewer-content" id="viewer-content">
@@ -659,10 +758,22 @@ def generate_listing_html(files, token, base_url):
         const fileItems = document.querySelectorAll('.file-item');
         const viewerContent = document.getElementById('viewer-content');
         const viewerTitle = document.getElementById('viewer-title');
+        const layout = document.querySelector('.layout');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const btnFilesToggle = document.getElementById('btn-files-toggle');
+
+        function openSidebar() {{ layout.classList.add('sidebar-open'); sidebarOverlay.setAttribute('aria-hidden', 'false'); }}
+        function closeSidebar() {{ layout.classList.remove('sidebar-open'); sidebarOverlay.setAttribute('aria-hidden', 'true'); }}
+        function toggleSidebar() {{ layout.classList.toggle('sidebar-open'); sidebarOverlay.setAttribute('aria-hidden', layout.classList.contains('sidebar-open') ? 'false' : 'true'); }}
+
+        if (btnFilesToggle) btnFilesToggle.addEventListener('click', toggleSidebar);
+        if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+
+        const isMobile = () => window.innerWidth <= 768;
 
         fileItems.forEach(item => {{
             item.addEventListener('click', () => {{
-                // Update active state
+                if (isMobile()) closeSidebar();
                 fileItems.forEach(f => f.classList.remove('active'));
                 item.classList.add('active');
 
@@ -798,18 +909,20 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(403)
             return
 
-        path = unquote(parsed.path)
+        raw_path = parsed.path
 
         # Serve directory listing
-        if path == "/" or path == "":
+        if raw_path == "/" or raw_path == "":
             files_info = []
-            for basename, fullpath in FILE_MAP.items():
+            for fullpath in FILE_MAP.values():
                 if os.path.exists(fullpath):
                     size = os.path.getsize(fullpath)
                     can_view = is_text_file(fullpath) or is_image_file(fullpath)
                     is_image = is_image_file(fullpath)
+                    basename = os.path.basename(fullpath)
                     lang = get_language_from_filename(basename) if can_view and not is_image else ''
-                    files_info.append((basename, format_size(size), can_view, is_image, lang))
+                    url_segment = path_to_url_segment(fullpath)
+                    files_info.append((fullpath, url_segment, format_size(size), can_view, is_image, lang))
 
             # Get base URL from request
             host = self.headers.get('Host', 'localhost:8080')
@@ -823,10 +936,16 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(html.encode())
             return
 
-        # Serve individual file
-        filename = path.lstrip("/")
-        if filename in FILE_MAP:
-            filepath = FILE_MAP[filename]
+        # Serve individual file (path segment is URL-encoded full path)
+        # Use raw path and unquote only the segment after the first slash, so
+        # /%2FUsers%2F... stays encoded until we decode just that part (avoids
+        # //Users/... and lstrip("/") turning absolute path into relative)
+        path_segment = raw_path[1:] if raw_path.startswith("/") else raw_path
+        decoded_path = unquote(path_segment)
+        lookup_path = os.path.normpath(os.path.abspath(decoded_path)) if decoded_path else ""
+        if lookup_path in FILE_MAP:
+            filepath = FILE_MAP[lookup_path]
+            filename = os.path.basename(filepath)
             if os.path.exists(filepath):
                 # Check if view mode is requested
                 view_mode = qs.get("view", [None])[0] == "1"
@@ -848,7 +967,7 @@ class Handler(SimpleHTTPRequestHandler):
                             return
                         else:
                             # Return HTML viewer page
-                            html = generate_file_viewer_html(filename, content, filepath, TOKEN)
+                            html = generate_file_viewer_html(filename, content, filepath, TOKEN, path_to_url_segment(filepath))
                             self.send_response(200)
                             self.send_header("Content-type", "text/html")
                             self.end_headers()
@@ -967,31 +1086,26 @@ echo -e "${CYAN}${FOLDER}${NC} ${BOLD}Directory:${NC}"
 echo -e "   ${BLUE}$URL/?token=$TOKEN${NC}"
 echo ""
 
-# Show individual file URLs
+# Show individual file URLs (full path encoded so same-name files stay distinct)
 if [ ${#FILES[@]} -eq 1 ]; then
-    filename=$(basename "${FILES[0]}")
+    encoded=$(printf '%s' "${FILES[0]}" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read(), safe=''))")
     echo -e "${CYAN}${FILE_ICON}${NC} ${BOLD}File URL:${NC}"
-    echo -e "   ${BLUE}$URL/$filename?token=$TOKEN${NC}"
+    echo -e "   ${BLUE}$URL/$encoded?token=$TOKEN${NC}"
 else
     echo -e "${CYAN}${FILE_ICON}${NC} ${BOLD}Individual files:${NC}"
     for file in "${FILES[@]}"; do
-        filename=$(basename "$file")
-        echo -e "   ${BLUE}$URL/$filename?token=$TOKEN${NC}"
+        encoded=$(printf '%s' "$file" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read(), safe=''))")
+        echo -e "   ${BLUE}$URL/$encoded?token=$TOKEN${NC}"
     done
 fi
 
 echo ""
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${DIM}Quick download commands:${NC}"
-if [ ${#FILES[@]} -eq 1 ]; then
-    filename=$(basename "${FILES[0]}")
-    echo -e "${DIM}   curl -O \"$URL/$filename?token=$TOKEN\"${NC}"
-else
-    for file in "${FILES[@]}"; do
-        filename=$(basename "$file")
-        echo -e "${DIM}   curl -O \"$URL/$filename?token=$TOKEN\"${NC}"
-    done
-fi
+for file in "${FILES[@]}"; do
+    encoded=$(printf '%s' "$file" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read(), safe=''))")
+    echo -e "${DIM}   curl -o \"$(basename "$file")\" \"$URL/$encoded?token=$TOKEN\"${NC}"
+done
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
