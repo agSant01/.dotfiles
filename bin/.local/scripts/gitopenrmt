@@ -4,17 +4,60 @@ PNAME=$(basename $0)
 
 echoerr() { printf "%s\n" "$*" >&2; }
 
-if [[ $# = 0 ]]; then
-    echoerr "$PNAME error: No arguments provided"
-    echoerr -e "Usage:\t$PNAME [-pr] [remote_name]"
-    exit 1;
-elif [ $# = 1 ]; then
-    REMOTE_NAME=$1
-    PR_FLAG=0
-else
-    PR_FLAG=1
-    REMOTE_NAME=$2
-fi
+usage() {
+    echoerr "Usage: $PNAME [--origin <remote_name>] [--pr [<number>]] [--issue [<number>]]"
+    echoerr ""
+    echoerr "Options:"
+    echoerr "  --origin <remote_name>  Remote to open (default: origin)"
+    echoerr "  --pr [<number>]         Open the pull requests page, or a specific PR"
+    echoerr "  --issue [<number>]      Open the issues page, or a specific issue"
+}
+
+REMOTE_NAME="origin"
+PR_FLAG=0
+PR_NUMBER=""
+ISSUE_FLAG=0
+ISSUE_NUMBER=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --origin)
+            if [[ -z "$2" || "$2" == --* ]]; then
+                echoerr "$PNAME error: --origin requires a remote name"
+                exit 1
+            fi
+            REMOTE_NAME="$2"
+            shift 2
+            ;;
+        --pr)
+            PR_FLAG=1
+            if [[ -n "$2" && "$2" != --* ]]; then
+                PR_NUMBER="$2"
+                shift 2
+            else
+                shift
+            fi
+            ;;
+        --issue)
+            ISSUE_FLAG=1
+            if [[ -n "$2" && "$2" != --* ]]; then
+                ISSUE_NUMBER="$2"
+                shift 2
+            else
+                shift
+            fi
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echoerr "$PNAME error: Unknown argument \"$1\""
+            usage
+            exit 1
+            ;;
+    esac
+done
 
 REMOTE_URL=$(git remote get-url $REMOTE_NAME)
 RET_CODE=$?
@@ -31,14 +74,36 @@ if [[ "$REMOTE_URL" =~ ^git@github ]]; then
     )
 fi
 
+if [[ "$PR_FLAG" = "1" && "$ISSUE_FLAG" = "1" ]]; then
+    echoerr "$PNAME error: --pr and --issue are mutually exclusive"
+    exit 1
+fi
+
 if [[ "$PR_FLAG" = "1" ]]; then
-    REMOTE_URL="$REMOTE_URL/pulls"
+    if [[ -n "$PR_NUMBER" ]]; then
+        REMOTE_URL="$REMOTE_URL/pull/$PR_NUMBER"
+    else
+        REMOTE_URL="$REMOTE_URL/pulls"
+    fi
+fi
+
+if [[ "$ISSUE_FLAG" = "1" ]]; then
+    if [[ -n "$ISSUE_NUMBER" ]]; then
+        REMOTE_URL="$REMOTE_URL/issues/$ISSUE_NUMBER"
+    else
+        REMOTE_URL="$REMOTE_URL/issues"
+    fi
 fi
 
 echo "$PNAME: opening \"$REMOTE_URL\""
 
 if [[ "$(uname -r | sed -n "/microsoft/p" | wc -l)" = "1" ]]; then
     powershell.exe /c start $REMOTE_URL
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+    open $REMOTE_URL
+elif [[ "$(uname -s)" == "Linux" ]]; then
+    xdg-open $REMOTE_URL
 else
-    xgd-open $REMOTE_URL
+    echoerr "$PNAME error: Unsupported platform"
+    exit 1
 fi

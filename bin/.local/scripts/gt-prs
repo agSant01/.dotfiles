@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# my-prs.sh - List PRs requesting your review as Graphite URLs
+#
+# Fetches open pull requests assigned to you for review across all repos
+# and maps each GitHub URL to its Graphite equivalent.
+#
+# Options:
+#   --plain                Machine-readable output (tab-separated: url, title)
+#   --ignore=owner/repo    Exclude a repo from results (repeatable)
+#   -L, --limit <n>        Max results to fetch (default 30, passed to gh)
+#
+# Any other args are forwarded directly to `gh search prs`.
+#
+# Examples:
+#   ./my-prs.sh                                        # all open review requests
+#   ./my-prs.sh --ignore=org/noisy-repo                # exclude a repo
+#   ./my-prs.sh --ignore=org/repo-a --ignore=org/repo-b  # exclude multiple
+#   ./my-prs.sh -L 100                                 # fetch up to 100 results
+#   ./my-prs.sh --plain                                # tab-separated for scripting
+#   ./my-prs.sh --plain | cut -f1                      # just the URLs
+#   ./my-prs.sh --owner=myorg                          # only PRs from a specific org
+#   ./my-prs.sh -- -label:wip                          # exclude PRs labeled "wip"
+
+plain=false
+args=()
+qualifiers=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --plain) plain=true ;;
+    --ignore=*) qualifiers+=("-repo:${1#--ignore=}") ;;
+    --ignore) qualifiers+=("-repo:$2"); shift ;;
+    *) args+=("$1") ;;
+  esac
+  shift
+done
+if [[ ${#qualifiers[@]} -gt 0 ]]; then
+  args+=("--" "${qualifiers[@]}")
+fi
+
+i=0
+total=$(gh api 'search/issues?q=is:open+is:pr+review-requested:@me&per_page=1' --jq '.total_count')
+
+BOLD=$'\033[1m'
+DIM=$'\033[2m'
+CYAN=$'\033[4;36m'
+YELLOW=$'\033[1;33m'
+RESET=$'\033[0m'
+
+while IFS=$'\t' read -r repo gh_url title; do
+  ((i++))
+
+  graphite_url=$(echo "$gh_url" | sed 's|github.com|app.graphite.dev/github/pr|;s|/pull/|/|')
+
+  if $plain; then
+    printf "%s\t%s\n" "$graphite_url" "$title"
+  else
+    printf "\n  %s%d.%s %s%s%s\n" "$YELLOW" "$i" "$RESET" "$BOLD" "$title" "$RESET"
+    printf "     %s%s%s\n" "$DIM" "$repo" "$RESET"
+    printf "     %s%s%s\n" "$CYAN" "$graphite_url" "$RESET"
+  fi
+done < <(gh search prs \
+  --review-requested "@me" \
+  --state open \
+  --json repository,title,number,url \
+  --jq '.[] | "\(.repository.nameWithOwner)\t\(.url)\t\(.title)"' \
+  "${args[@]+"${args[@]}"}")
+
+if [[ $i -eq 0 ]]; then
+  echo "No PRs requesting your review."
+elif [[ $i -lt $total ]]; then
+  if $plain; then
+    echo "# Showing $i of $total pull requests. Use -L <number> to see more."
+  else
+    printf "\n  %sShowing %d of %d pull requests. Use -L <number> to see more.%s\n" "$DIM" "$i" "$total" "$RESET"
+  fi
+fi

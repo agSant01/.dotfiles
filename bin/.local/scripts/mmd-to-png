@@ -1,0 +1,19 @@
+
+FILE=$1
+
+SCALE=$2
+if [ -z "$SCALE" ]; then
+    SCALE=10
+fi
+
+DARK=$3
+if [ $DARK ]; then
+    DARK="--theme dark"
+fi
+
+# YYYY-MM-DD-HH-MM-SS
+time=$(date +%Y-%m-%d-%H-%M-%S)
+OUTPUT_FILE=${FILE%.mmd}-${time}.png
+echo "Converting $FILE to $OUTPUT_FILE"
+
+npx -p @mermaid-js/mermaid-cli mmdc -i $FILE -o $OUTPUT_FILE -s $SCALE $DARK

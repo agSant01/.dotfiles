@@ -19,7 +19,9 @@ if [[ -n "$BACKUPS_EXIST" ]]; then
     fi
 fi
 
-STOW_FOLDERS=(common vim tmux bin nvm yarn bash zsh gh fzf git fdfind)
+source $HOME/.dotfiles/colors.sh
+
+STOW_FOLDERS=(vim tmux bin nvm yarn bash zsh gh fzf git fdfind perl common)
 STOW_DIR="$HOME"
 
 # Pre-create ~/.local dirs so stow --no-folding creates real dirs and only symlinks package files.
@@ -31,21 +33,21 @@ cp -L ~/.profile ~/.profile.bk
 rm $HOME/.profile
 rm -f ~/.bash_logout
 
-echo -e "$GREEN[SETUP]$RESET_COLOR Start...\n"
+echo -e "${GREEN}[SETUP]$RESET_COLOR Start...\n"
 
 pushd ~/.dotfiles
 
 # Tier 1: public packages
-for folder in ${STOW_FOLDERS[@]}
+for folder in "${STOW_FOLDERS[@]}"
 do
     if [[ ! -d "./$folder" ]]; then
         continue
     fi
     if [[ -z "$(ls -A ./$folder 2>/dev/null)" ]]; then
-        echo -e "$BLUE[STOW]$RESET_COLOR skipping empty package: $folder\n"
+        echo -e "${BLUE}[STOW]$RESET_COLOR skipping empty package: $folder\n"
         continue
     fi
-    echo -e "$BLUE[STOW]$RESET_COLOR $folder stowed to $STOW_DIR\n"
+    echo -e "${BLUE}[STOW]$RESET_COLOR $folder stowed to $STOW_DIR\n"
 
     if [ -n "$(ls ./$folder/install 2> /dev/null)" ]; then
         bash $HOME/.dotfiles/$folder/install
@@ -61,10 +63,10 @@ if [[ -d ./overlay ]]; then
         pkg=$(basename "$dir")
         [[ "$pkg" != _* ]] || continue
         if [[ -z "$(ls -A "$dir" 2>/dev/null)" ]]; then
-            echo -e "$BLUE[STOW]$RESET_COLOR skipping empty overlay: $pkg\n"
+            echo -e "${BLUE}[STOW]$RESET_COLOR skipping empty overlay: $pkg\n"
             continue
         fi
-        echo -e "$BLUE[STOW]$RESET_COLOR overlay/$pkg stowed to $STOW_DIR\n"
+        echo -e "${BLUE}[STOW]$RESET_COLOR overlay/$pkg stowed to $STOW_DIR\n"
         if [ -n "$(ls "$dir/install" 2> /dev/null)" ]; then
             bash "$HOME/.dotfiles/overlay/$pkg/install"
         else
@@ -75,5 +77,5 @@ fi
 
 popd
 
-echo -e "$GREEN[SUCCESS]$RESET_COLOR Completed Stow setup.\n"
+echo -e "${GREEN}[SUCCESS]$RESET_COLOR Completed Stow setup.\n"
 echo -e "=>  Run $BOLD\"source ~/.bashrc\"$RESET_COLOR or $BOLD\"source ~/.zshrc\"$RESET_COLOR to load changes to current shell"

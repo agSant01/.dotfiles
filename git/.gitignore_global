@@ -1,0 +1,9 @@
+# Cursor
+.cursor/*
+mcp/*
+.drsync.conf
+.drsyncignore
+.playground
+.local_dump
+.cursor
+.claude

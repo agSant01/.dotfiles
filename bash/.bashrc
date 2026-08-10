@@ -152,3 +152,17 @@ else
 fi
 unset color_prompt force_color_prompt
 
+eval "$(zoxide init bash)"
+
+# Generated for envman. Do not edit.
+[ -s "$HOME/.config/envman/load.sh" ] && source "$HOME/.config/envman/load.sh"
+
+# pnpm
+export PNPM_HOME="/home/gbrl/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
+. "$HOME/.cargo/env"
+. "/Users/gsantiago/.deno/env"

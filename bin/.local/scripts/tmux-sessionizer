@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
 
+PATHS_TO_SEARCH=(
+    "$PWD"
+    "$HOME"
+    "$HOME/personal"
+    "$HOME/test"
+    "$HOME/**/*.git"
+    # yes
+    "$HOME/projects-workspace/catalyst*"
+    "$HOME/projects-workspace"
+    "$HOME/projects-workspace/mochicake"
+)
+
+ALL_PATHS="${PATHS_TO_SEARCH[*]}"
+
 if [[ $# -eq 1 ]]; then
     SELECTED=$1
 else
-    SELECTED=$(fd . $PWD $HOME $HOME/personal $HOME/projects-workspace $HOME/test $HOME/**/*.git/ \
+    SELECTED=$(fd . $ALL_PATHS \
         -E refs -E logs -E worktrees -E branches -E info -E objects -E hooks \
         --max-depth 1 --type directory -a 2> /dev/null \
         | uniq \

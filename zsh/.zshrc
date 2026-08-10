@@ -1,3 +1,12 @@
+# OPENSPEC:START
+# OpenSpec shell completions configuration
+fpath=("$HOME/.oh-my-zsh/custom/completions" $fpath)
+autoload -Uz compinit
+compinit
+# OPENSPEC:END
+
+# Add deno completions to search path
+if [[ ":$FPATH:" != *":$HOME/.zsh/completions:"* ]]; then export FPATH="$HOME/.zsh/completions:$FPATH"; fi
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH
 
@@ -8,7 +17,7 @@ export ZSH="$HOME/.oh-my-zsh"
 # load a random theme each time Oh My Zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-ZSH_THEME="robbyrussell"
+ZSH_THEME="example"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -66,6 +75,23 @@ zstyle ':omz:update' mode reminder  # just remind me to update when it's time
 # ZSH_CUSTOM=/path/to/new-custom-folder
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# pnpm
+export PNPM_HOME="$HOME/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+# in ~/.zshrc, before Oh My Zsh is sourced:
+ZSH_DOTENV_FILE=.dotenv
 
 # Which plugins would you like to load?
 # Standard plugins can be found in $ZSH/plugins/
@@ -133,7 +159,6 @@ alias zshconfig="code ~/.zshrc"
 alias ohmyzsh="code ~/.oh-my-zsh"
 alias resrc="source ~/.zshrc"
 
-
 source $HOME/.env
 source $HOME/.paths
 source "$HOME/.keybindings"
@@ -142,6 +167,9 @@ if [[ ! -f "$HOME/.secrets" ]]; then
 fi
 source "$HOME/.secrets"
 source "$HOME/.shared-rc.sh"
+
+# Generated for envman. Do not edit.
+[ -s "$HOME/.config/envman/load.sh" ] && source "$HOME/.config/envman/load.sh"
 #compdef gt
 ###-begin-gt-completions-###
 #
@@ -170,3 +198,25 @@ fpath=($HOME/.docker/completions $fpath)
 autoload -Uz compinit
 compinit
 # End of Docker CLI completions
+
+eval "$(op completion zsh)"; compdef _op op
+# The following lines have been added by Docker Desktop to enable Docker CLI completions.
+fpath=($HOME/.docker/completions $fpath)
+autoload -Uz compinit
+compinit
+# End of Docker CLI completion
+. "$HOME/.deno/env"
+
+if [[ $(uname) -eq "Darwin" ]]; then
+  eval "$(zoxide init zsh)"
+else
+  eval "$(zoxide init bash)"
+fi
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f $HOME/Downloads/google-cloud-sdk/path.zsh.inc ]; then . $HOME/Downloads/google-cloud-sdk/path.zsh.inc; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f $HOME/Downloads/google-cloud-sdk/completion.zsh.inc ]; then . $HOME/Downloads/google-cloud-sdk/completion.zsh.inc; fi
+
+_ZO_DOCTOR=0

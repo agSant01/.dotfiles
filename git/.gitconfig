@@ -1,5 +1,4 @@
 [user]
-	email = g.santiago@orbisops.com
 	name = Gabriel Santiago
 [init]
 	defaultBranch = main
@@ -11,9 +10,14 @@
 	ll		 = log --pretty=better-oneline --numstat
 	ls		 = log --pretty=better-oneline
 	s		 = status
-	t 		 = "!bash /home/gbrl18/.dotfiles/bin/.local/scripts/h"
 	tree	 = log --pretty=better-oneline --all --graph
 	wt		 = worktree
 	wt-clone = "!clone-bare"
 	wtl		 = worktree list -v
-    open-remote = !gh repo view -w
+    open-remote = "!gitopenrmt"
+[core]
+	excludesFile = ~/.gitignore_global
+[pretty]
+	better-oneline = format:%C(yellow)%h%C(reset) %C(green)(%ar)%C(reset) %s %C(dim white)- %an%C(reset) %C(auto)%d%C(reset)
+[include]
+	path = ~/.gitconfig-local
