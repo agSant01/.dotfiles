@@ -5,15 +5,17 @@ PNAME=$(basename $0)
 echoerr() { printf "%s\n" "$*" >&2; }
 
 usage() {
-    echoerr "Usage: $PNAME [--origin <remote_name>] [--pr [<number>]] [--issue [<number>]]"
+    echoerr "Usage: $PNAME [--origin <remote_name>] [-b] [--pr [<number>]] [--issue [<number>]]"
     echoerr ""
     echoerr "Options:"
     echoerr "  --origin <remote_name>  Remote to open (default: origin)"
+    echoerr "  -b, --branch            Open the current branch's tree view"
     echoerr "  --pr [<number>]         Open the pull requests page, or a specific PR"
     echoerr "  --issue [<number>]      Open the issues page, or a specific issue"
 }
 
 REMOTE_NAME="origin"
+BRANCH_FLAG=0
 PR_FLAG=0
 PR_NUMBER=""
 ISSUE_FLAG=0
@@ -28,6 +30,10 @@ while [[ $# -gt 0 ]]; do
             fi
             REMOTE_NAME="$2"
             shift 2
+            ;;
+        -b|--branch)
+            BRANCH_FLAG=1
+            shift
             ;;
         --pr)
             PR_FLAG=1
@@ -74,9 +80,18 @@ if [[ "$REMOTE_URL" =~ ^git@github ]]; then
     )
 fi
 
-if [[ "$PR_FLAG" = "1" && "$ISSUE_FLAG" = "1" ]]; then
-    echoerr "$PNAME error: --pr and --issue are mutually exclusive"
+if [[ $((BRANCH_FLAG + PR_FLAG + ISSUE_FLAG)) -gt 1 ]]; then
+    echoerr "$PNAME error: -b, --pr and --issue are mutually exclusive"
     exit 1
+fi
+
+if [[ "$BRANCH_FLAG" = "1" ]]; then
+    BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+    RET_CODE=$?
+    if [[ $RET_CODE -ne 0 ]]; then
+        exit $RET_CODE
+    fi
+    REMOTE_URL="$REMOTE_URL/tree/$BRANCH_NAME"
 fi
 
 if [[ "$PR_FLAG" = "1" ]]; then
