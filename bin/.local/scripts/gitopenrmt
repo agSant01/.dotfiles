@@ -10,7 +10,7 @@ usage() {
     echoerr "Options:"
     echoerr "  --origin <remote_name>  Remote to open (default: origin)"
     echoerr "  -b, --branch            Open the current branch's tree view"
-    echoerr "  --pr [<number>]         Open the pull requests page, or a specific PR"
+    echoerr "  -p, --pr [<number>]     Open the current branch's PR, a specific PR, or the PRs page"
     echoerr "  --issue [<number>]      Open the issues page, or a specific issue"
 }
 
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
             BRANCH_FLAG=1
             shift
             ;;
-        --pr)
+        -p|--pr)
             PR_FLAG=1
             if [[ -n "$2" && "$2" != --* ]]; then
                 PR_NUMBER="$2"
@@ -98,7 +98,18 @@ if [[ "$PR_FLAG" = "1" ]]; then
     if [[ -n "$PR_NUMBER" ]]; then
         REMOTE_URL="$REMOTE_URL/pull/$PR_NUMBER"
     else
-        REMOTE_URL="$REMOTE_URL/pulls"
+        BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        PR_URL=""
+        if [[ -n "$BRANCH_NAME" ]] && command -v gh >/dev/null 2>&1; then
+            PR_URL=$(gh pr view "$BRANCH_NAME" --json url --jq .url 2>/dev/null)
+        fi
+        if [[ -n "$PR_URL" ]]; then
+            REMOTE_URL="$PR_URL"
+        elif [[ -n "$BRANCH_NAME" ]]; then
+            REMOTE_URL="$REMOTE_URL/pulls?q=is%3Apr+head%3A$BRANCH_NAME"
+        else
+            REMOTE_URL="$REMOTE_URL/pulls"
+        fi
     fi
 fi
 
