@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+# Pick a git worktree with fzf. Single source of truth shared by the `wtl`
+# shell alias and the tmux keybinding.
+#
+#   worktree                  print the selected worktree path (default)
+#   worktree --cd             same as default; for use as: cd "$(worktree --cd)"
+#   worktree --switch [pane]  cd the given tmux pane (default: current) into it,
+#                             i.e. change the current window instead of opening one
+#   worktree --window         open/switch to a separate tmux window in the worktree
+
+MODE="cd"
+TARGET_PANE=""
+case "$1" in
+    --cd | "") MODE="cd" ;;
+    --switch) MODE="switch"; TARGET_PANE="$2" ;;
+    --window) MODE="window" ;;
+    *)
+        echo "usage: worktree [--cd|--switch [pane]|--window]" >&2
+        exit 2
+        ;;
+esac
+
+# Reorder to "<hash>  <path>  <branch>" for display; keep path as field 2 so it
+# can be extracted regardless of any trailing branch/detached info.
+SELECTED=$(git worktree list 2>/dev/null \
+    | awk '{ path=$1; hash=$2; $1=""; $2=""; sub(/^ +/, ""); printf "%-10s %s  %s\n", hash, path, $0 }' \
+    | fzf --prompt="Switch Worktree: " --reverse --cycle --border=bold \
+    | awk '{print $2}')
+
+if [[ -z $SELECTED ]]; then
+    exit 0
+fi
+
+case "$MODE" in
+    cd)
+        echo "$SELECTED"
+        ;;
+
+    switch)
+        # cd the current window's pane into the selected worktree.
+        [[ -z $TARGET_PANE ]] && TARGET_PANE=$(tmux display-message -p '#{pane_id}')
+        tmux send-keys -t "$TARGET_PANE" "cd $(printf '%q' "$SELECTED")" Enter
+        ;;
+
+    window)
+        IS_TMUX_RUNNING=$(pgrep tmux)
+        if [[ -z $TMUX ]] && [[ -z $IS_TMUX_RUNNING ]]; then
+            tmux-sessionizer "$SELECTED"
+            exit 0
+        fi
+
+        BRANCH_NAME=$(basename "$SELECTED")
+        SESSION_NAME=$(tmux display-message -p "#{session_name}")
+        CLEAN_NAME=$(echo "$BRANCH_NAME" | tr "./" "__")
+        TARGET="$SESSION_NAME:$CLEAN_NAME"
+
+        if ! tmux has-session -t "$TARGET" 2>/dev/null; then
+            tmux new-window -n "$CLEAN_NAME" -c "$SELECTED"
+            exit 0
+        fi
+
+        tmux select-window -t "$TARGET"
+        ;;
+esac
